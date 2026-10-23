@@ -1,103 +1,138 @@
 <script lang="ts">
-  import { useRegisterSW } from 'virtual:pwa-register/svelte';
+  import ConfirmHost from './components/ConfirmHost.svelte';
+  import TabBar from './components/TabBar.svelte';
+  import Toast from './components/Toast.svelte';
+  import { applyUpdate, pwa } from './lib/pwa.svelte';
+  import { router } from './lib/router.svelte';
+  import { store } from './lib/store.svelte';
+  import Backup from './pages/Backup.svelte';
+  import Cook from './pages/Cook.svelte';
+  import More from './pages/More.svelte';
+  import Plan from './pages/Plan.svelte';
+  import ProductEdit from './pages/ProductEdit.svelte';
+  import Products from './pages/Products.svelte';
+  import RecipeDetail from './pages/RecipeDetail.svelte';
+  import RecipeEdit from './pages/RecipeEdit.svelte';
+  import Recipes from './pages/Recipes.svelte';
+  import Sections from './pages/Sections.svelte';
+  import Shopping from './pages/Shopping.svelte';
 
-  const { needRefresh, updateServiceWorker } = useRegisterSW({
-    onRegisteredSW(_swUrl, registration) {
-      if (!registration) return;
-      // Android keeps installed apps in memory, so also check for a new version
-      // whenever the app comes back to the foreground, not only on a cold start.
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') void registration.update();
-      });
-    },
-  });
-
-  const installed = window.matchMedia('(display-mode: standalone)').matches;
+  const segments = $derived(router.route.segments);
+  const [top = 'recipes', second, third] = $derived(segments);
+  const topLevel = $derived(segments.length <= 1);
   const iconUrl = `${import.meta.env.BASE_URL}icon.svg`;
-  const version = `${__BUILD_ID__} · ${__BUILD_DATE__}`;
 </script>
 
-<main>
-  <img class="icon" src={iconUrl} alt="" width="104" height="104" />
-  <h1>Sanso</h1>
-  <p class="tagline">Recipes, meal plan and shopping list.</p>
+{#if store.loadError}
+  <div class="splash">
+    <h1>Sanso couldn’t open its storage</h1>
+    <p>{store.loadError}</p>
+    <p>
+      Try closing and reopening the app. If you use a private window, storage may be turned off.
+    </p>
+  </div>
+{:else if !store.ready}
+  <div class="splash" aria-busy="true">
+    <img src={iconUrl} alt="" width="72" height="72" />
+  </div>
+{:else}
+  {#key router.route.path}
+    {#if top === 'recipes' && second === 'new'}
+      <RecipeEdit />
+    {:else if top === 'recipes' && second && third === 'edit'}
+      <RecipeEdit id={second} />
+    {:else if top === 'recipes' && second}
+      <RecipeDetail id={second} />
+    {:else if top === 'plan'}
+      <Plan />
+    {:else if top === 'shopping'}
+      <Shopping />
+    {:else if top === 'cook'}
+      <Cook />
+    {:else if top === 'more' && second === 'products' && third}
+      <ProductEdit id={third} />
+    {:else if top === 'more' && second === 'products'}
+      <Products />
+    {:else if top === 'more' && second === 'sections'}
+      <Sections />
+    {:else if top === 'more' && second === 'backup'}
+      <Backup />
+    {:else if top === 'more'}
+      <More />
+    {:else}
+      <Recipes />
+    {/if}
+  {/key}
 
-  {#if installed}
-    <p class="note">Installed. Works offline, and new features will appear here.</p>
-  {:else}
-    <p class="note">To install, open Chrome's ⋮ menu and add it to your home screen.</p>
+  {#if topLevel}
+    <TabBar />
   {/if}
+{/if}
 
-  <p class="version">Version {version}</p>
-</main>
-
-{#if $needRefresh}
-  <div class="update" role="status">
-    <span>A new version is ready.</span>
-    <button type="button" onclick={() => updateServiceWorker(true)}>Update</button>
+{#if pwa.needRefresh}
+  <div class="update" class:raised={topLevel} role="status">
+    <span>A new version of Sanso is ready.</span>
+    <button type="button" onclick={applyUpdate}>Update</button>
   </div>
 {/if}
 
+<Toast />
+<ConfirmHost />
+
 <style>
-  main {
+  .splash {
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 8px;
     min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 2rem 1.5rem calc(2rem + env(safe-area-inset-bottom));
+    padding: 24px;
     text-align: center;
   }
 
-  .icon {
+  .splash img {
     border-radius: 22%;
     box-shadow: 0 12px 32px rgb(47 93 80 / 0.28);
   }
 
-  h1 {
-    margin: 1rem 0 0;
-    font-size: 2.75rem;
+  .splash h1 {
+    font-size: 1.5rem;
   }
 
-  .tagline {
+  .splash p {
+    max-width: 24rem;
     margin: 0;
     color: var(--muted);
-    font-size: 1.125rem;
-  }
-
-  .note {
-    max-width: 21rem;
-    margin: 1.75rem 0 0;
     line-height: 1.5;
-  }
-
-  .version {
-    margin: 2.5rem 0 0;
-    color: var(--muted);
-    font-size: 0.8125rem;
   }
 
   .update {
     position: fixed;
-    inset: auto 1rem calc(1rem + env(safe-area-inset-bottom));
+    inset: auto 12px calc(12px + var(--safe-bottom));
+    z-index: 30;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 0.625rem 0.625rem 0.625rem 1.25rem;
+    gap: 12px;
+    max-width: 616px;
+    margin: 0 auto;
+    padding: 8px 8px 8px 18px;
     border-radius: 999px;
     background: var(--accent);
     color: var(--on-accent);
-    box-shadow: 0 10px 28px rgb(0 0 0 / 0.2);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .update.raised {
+    bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 12px);
   }
 
   .update button {
+    padding: 10px 18px;
     border: 0;
     border-radius: 999px;
-    padding: 0.625rem 1.25rem;
     background: var(--on-accent);
     color: var(--accent);
-    font-weight: 600;
+    font-weight: 700;
   }
 </style>
