@@ -1,6 +1,6 @@
 /// <reference types="svelte" />
 /// <reference types="vite/client" />
-/// <reference types="vite-plugin-pwa/svelte" />
+/// <reference types="vite-plugin-pwa/client" />
 
 /** Short commit id of this build, or "dev" for local builds. Set in vite.config.ts. */
 declare const __BUILD_ID__: string;
