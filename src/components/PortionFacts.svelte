@@ -4,7 +4,6 @@
   import {
     formatKcal,
     formatMacro,
-    recipeFacts,
     weightLabel,
     type LineFacts,
     type Missing,
@@ -12,19 +11,12 @@
   import { formatPrice } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
   import { store } from '../lib/store.svelte';
-  import { withPartCost } from '../lib/breakdown';
   import type { Product, Recipe } from '../lib/types';
   import Sheet from './Sheet.svelte';
 
   let { recipe }: { recipe: Recipe } = $props();
 
-  // Parts of something cut up at home, like chicken thighs, are priced by their cost share.
-  const facts = $derived(
-    recipeFacts(recipe, (name) => {
-      const product = store.match(name);
-      return product && withPartCost(product, store.sources);
-    }),
-  );
+  const facts = $derived(store.factsFor(recipe));
   const total = $derived(facts.lines.length);
   const hasNutrition = $derived(facts.nutritionCount > 0);
   const hasCost = $derived(facts.costCount > 0);

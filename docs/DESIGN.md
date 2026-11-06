@@ -41,6 +41,11 @@ It's for a single user, so there's no sharing or multi-user sync.
 - The list can be searched (titles, tags and ingredients), filtered by tag and sorted by score, newest, quickest or name.
 - The recipe page scales ingredients with a portions stepper, keeping the wording ("3 garlic cloves" becomes "1½ garlic cloves", "1 onion" becomes "2 onions").
 
+### Recipe PDF and photo crop
+
+- The PDF button on a recipe makes an A4 PDF on the phone with pdf-lib (`src/lib/recipePdf.ts`, loaded only when used): photo across the top, title, tags, times, score and portions, the per-portion card, ingredients beside the steps, and notes. Ingredients use the portions set on the recipe page. It uses the PDF standard fonts (Times, Helvetica) so nothing is downloaded; characters they lack are swapped (⅓ -> 1/3) or dropped. Share sends it through Android's share menu; Save puts it in Downloads.
+- Picking a recipe photo opens a crop sheet (`src/components/CropSheet.svelte`) at 4:3, the shape of the editor's preview: drag to move, pinch or slider to zoom. "Use whole photo" skips it, and Crop on the editor crops the current photo again.
+
 ### Ingredient lines
 
 Typed one per line, the way you'd say them. `src/lib/ingredients.ts` reads:
