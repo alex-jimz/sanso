@@ -2,7 +2,9 @@
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Package from '@lucide/svelte/icons/package';
   import Plus from '@lucide/svelte/icons/plus';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import Search from '@lucide/svelte/icons/search';
+  import ProductPhoto from '../components/ProductPhoto.svelte';
   import { todayISO } from '../lib/dates';
   import { normalizeName } from '../lib/ingredients';
   import { packLabel } from '../lib/listView';
@@ -89,14 +91,20 @@
       <h2>No products yet</h2>
       <p>
         Products are the things you buy. They appear as you sort shopping list items into shop
-        sections. To add one with its link, open the product on aldi.ie in Chrome, tap Share and
-        pick Sanso.
+        sections, or you can add them from aldi.ie with their prices and photos.
       </p>
       <button class="btn btn-primary" type="button" onclick={() => router.go('/more/products/new')}>
         <Plus size={20} /> Add a product
       </button>
+      <button class="btn btn-outline" type="button" onclick={() => router.go('/more/aldi')}>
+        <RefreshCw size={18} /> Add from aldi.ie
+      </button>
     </div>
   {:else}
+    <a class="aldi" href="#/more/aldi" onclick={(e) => open(e, '/more/aldi')}>
+      <RefreshCw size={18} />
+      <span>Get prices and photos from aldi.ie</span>
+    </a>
     <div class="tools">
       <label class="search">
         <span class="sr-only">Search products</span>
@@ -129,6 +137,7 @@
                 href={`#/more/products/${product.id}`}
                 onclick={(e) => open(e, `/more/products/${product.id}`)}
               >
+                <ProductPhoto url={product.imageUrl} />
                 <span class="row-main">
                   <span class="row-title">{product.name}</span>
                   {#if details(product)}<span class="row-sub">{details(product)}</span>{/if}
@@ -152,6 +161,19 @@
     display: grid;
     gap: 12px;
     margin: 8px 0 20px;
+  }
+
+  .aldi {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-weight: 650;
+    text-decoration: none;
   }
 
   .group {

@@ -12,12 +12,13 @@ const buildId = process.env.GITHUB_SHA?.slice(0, 7) ?? 'dev';
 const buildDate = new Date().toISOString().slice(0, 10);
 
 // The app holds a GitHub token for backups, so production builds only run
-// their own scripts and only talk to themselves and api.github.com.
+// their own scripts and only talk to themselves and api.github.com. Images
+// may also come from Aldi's image server, for product photos.
 const contentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' blob: data:",
+  "img-src 'self' blob: data: https://*.aldi.cx",
   "font-src 'self'",
   "connect-src 'self' https://api.github.com data:",
   "manifest-src 'self'",

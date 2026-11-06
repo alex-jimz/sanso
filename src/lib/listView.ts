@@ -3,7 +3,7 @@ import { packsNeeded } from './shopping';
 import type { Product, ShoppingItem } from './types';
 
 /** "400 g", "1 l" or "6-pack". */
-export function packLabel(product: Product): string {
+export function packLabel(product: Pick<Product, 'packSize' | 'packUnit'>): string {
   if (!product.packSize || !product.packUnit) return '';
   if (product.packUnit === 'pcs') return `${product.packSize}-pack`;
   return formatMetric(product.packSize, product.packUnit === 'g' ? 'mass' : 'volume');

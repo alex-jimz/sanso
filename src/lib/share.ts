@@ -2,30 +2,51 @@
 // Chrome sends the page title and URL; some apps put everything in `text`.
 
 import { capitalize } from './ingredients';
-import type { PackUnit, Shop } from './types';
+import type { PackUnit, Product, Shop } from './types';
 import { parseDecimal, safeUrl } from './util';
 
-export interface SharedProduct {
-  name: string;
-  url?: string;
-  shop: Shop;
-  packSize?: number;
-  packUnit?: PackUnit;
-}
+/** A new product's details from another app or from aldi.ie, before the user saves it. */
+export type SharedProduct = Pick<Product, 'name' | 'shop'> &
+  Partial<
+    Pick<
+      Product,
+      'url' | 'sku' | 'imageUrl' | 'packSize' | 'packUnit' | 'price' | 'offer' | 'priceCheckedAt'
+    >
+  >;
 
-const packPattern = /(\d+(?:[.,]\d+)?)\s?(kg|g|ml|cl|l|litre|litres)\b/i;
+const packPattern = /(?:(\d+)\s?x\s?)?(\d+(?:[.,]\d+)?)\s?(kg|g|ml|cl|l|litre|litres)\b/i;
+const countPattern = /\b(\d+)\s?(each|pack|pk|pcs|pieces)\b/i;
 
+/** "500g", "1.5 KG", "6 x 330ml" (1980 ml) or "4 Each" (4 pieces). */
 export function parsePackSize(text: string): { packSize: number; packUnit: PackUnit } | undefined {
   const m = packPattern.exec(text);
-  if (!m) return undefined;
-  const value = parseDecimal(m[1]!);
+  if (!m) {
+    const count = countPattern.exec(text);
+    const n = count ? Number(count[1]) : 0;
+    return n > 0 ? { packSize: n, packUnit: 'pcs' } : undefined;
+  }
+  const value = parseDecimal(m[2]!);
   if (!value) return undefined;
-  const unit = m[2]!.toLowerCase();
-  if (unit === 'kg') return { packSize: value * 1000, packUnit: 'g' };
-  if (unit === 'g') return { packSize: value, packUnit: 'g' };
-  if (unit === 'cl') return { packSize: value * 10, packUnit: 'ml' };
-  if (unit === 'ml') return { packSize: value, packUnit: 'ml' };
-  return { packSize: value * 1000, packUnit: 'ml' };
+  const times = m[1] ? Number(m[1]) : 1;
+  const unit = m[3]!.toLowerCase();
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  if (unit === 'kg') return { packSize: round(times * value * 1000), packUnit: 'g' };
+  if (unit === 'g') return { packSize: round(times * value), packUnit: 'g' };
+  if (unit === 'cl') return { packSize: round(times * value * 10), packUnit: 'ml' };
+  if (unit === 'ml') return { packSize: round(times * value), packUnit: 'ml' };
+  return { packSize: round(times * value * 1000), packUnit: 'ml' };
+}
+
+/** Aldi's product number from an aldi.ie product link, e.g. …/cucina-penne-000000000000282766. */
+export function aldiSku(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const { hostname, pathname } = new URL(url);
+    if (!/(^|\.)aldi\.ie$/i.test(hostname)) return undefined;
+    return /\/product\/[^/]*-(\d{6,18})\/?$/.exec(pathname)?.[1];
+  } catch {
+    return undefined;
+  }
 }
 
 function cleanTitle(title: string): string {
@@ -68,5 +89,5 @@ export function parseShare(params: URLSearchParams): SharedProduct | null {
   const pack =
     parsePackSize(rawName) ??
     (url ? parsePackSize(new URL(url).pathname.replace(/-/g, ' ')) : undefined);
-  return { name, url, shop, ...pack };
+  return { name, url, shop, sku: aldiSku(url), ...pack };
 }

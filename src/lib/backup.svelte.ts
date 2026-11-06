@@ -6,6 +6,7 @@
 // with the repository's tree first. The token never appears in backed-up files.
 
 import { allPhotos } from './db';
+import { blobToDataUrl, downloadFile } from './files';
 import { store } from './store.svelte';
 import type { BackupSettings, DataSnapshot } from './types';
 import { nowISO } from './util';
@@ -115,11 +116,20 @@ interface Head {
   base: string;
   branch: string;
   commit: string;
+  /** When the latest commit was made. */
+  date: string;
   tree: string;
   files: Map<string, string>;
 }
 
-async function readHead(token: string, repo: string, create: boolean): Promise<Head> {
+/**
+ * Reads the latest commit of the repository's default branch. An empty
+ * repository has no branch yet: with `create` a README is added to start one,
+ * otherwise the result is null.
+ */
+async function readHead(token: string, repo: string, create: true): Promise<Head>;
+async function readHead(token: string, repo: string, create: false): Promise<Head | null>;
+async function readHead(token: string, repo: string, create: boolean): Promise<Head | null> {
   const base = repoPath(repo);
   const info = await gh<{ private: boolean; default_branch: string }>(token, base);
   if (!info.private) {
@@ -133,14 +143,10 @@ async function readHead(token: string, repo: string, create: boolean): Promise<H
     commit = (await gh<{ object: { sha: string } }>(token, `${base}/git/ref/heads/${branch}`))
       .object.sha;
   } catch (error) {
-    // An empty repository has no branch yet. Adding a README creates it.
-    if (
-      !create ||
-      !(error instanceof GitHubError) ||
-      (error.status !== 409 && error.status !== 404)
-    ) {
+    if (!(error instanceof GitHubError) || (error.status !== 409 && error.status !== 404)) {
       throw error;
     }
+    if (!create) return null;
     const created = await gh<{ commit: { sha: string } }>(token, `${base}/contents/README.md`, {
       method: 'PUT',
       body: JSON.stringify({
@@ -150,14 +156,72 @@ async function readHead(token: string, repo: string, create: boolean): Promise<H
     });
     commit = created.commit.sha;
   }
-  const tree = (await gh<{ tree: { sha: string } }>(token, `${base}/git/commits/${commit}`)).tree
-    .sha;
+  const details = await gh<{ tree: { sha: string }; committer: { date: string } }>(
+    token,
+    `${base}/git/commits/${commit}`,
+  );
+  const tree = details.tree.sha;
   const listing = await gh<{ tree: { path: string; sha: string; type: string }[] }>(
     token,
     `${base}/git/trees/${tree}?recursive=1`,
   );
   const files = new Map(listing.tree.filter((t) => t.type === 'blob').map((t) => [t.path, t.sha]));
-  return { base, branch, commit, tree, files };
+  return { base, branch, commit, date: details.committer.date, tree, files };
+}
+
+async function readJsonFile(token: string, head: Head, path: string): Promise<unknown> {
+  const sha = head.files.get(path);
+  if (!sha) return undefined;
+  const blob = await gh<{ content: string }>(token, `${head.base}/git/blobs/${sha}`);
+  return JSON.parse(new TextDecoder().decode(fromBase64(blob.content)));
+}
+
+export interface BackupSummary {
+  /** When the latest backup was made. */
+  savedAt: string;
+  recipes: number;
+  products: number;
+}
+
+/**
+ * Checks the token and repository and says what backup it holds, without
+ * changing anything. Null means the repository has no Sanso backup yet.
+ */
+export async function inspectGitHubBackup(
+  settings: Pick<BackupSettings, 'repo' | 'token'>,
+): Promise<BackupSummary | null> {
+  const head = await readHead(settings.token, settings.repo, false);
+  if (!head?.files.has('recipes.json')) return null;
+  const [recipes, products] = await Promise.all([
+    readJsonFile(settings.token, head, 'recipes.json'),
+    readJsonFile(settings.token, head, 'products.json'),
+  ]);
+  return {
+    savedAt: head.date,
+    recipes: Array.isArray(recipes) ? recipes.length : 0,
+    products: Array.isArray(products) ? products.length : 0,
+  };
+}
+
+/**
+ * Refuses to replace a backup that has recipes or products with one that has
+ * none. That is what an empty phone, such as a new install, would upload, and
+ * it would hide the real backup from Restore.
+ */
+async function refuseEmptyOverwrite(head: Head, files: Map<string, Uint8Array>) {
+  const empty = await gitBlobSha(json([]));
+  for (const [path, what] of [
+    ['recipes.json', 'recipes'],
+    ['products.json', 'products'],
+  ] as const) {
+    const remote = head.files.get(path);
+    if (!remote || remote === empty) continue;
+    if ((await gitBlobSha(files.get(path)!)) !== empty) continue;
+    throw new Error(
+      `This phone has no ${what}, but the backup on GitHub has some, so Sanso didn’t replace it. ` +
+        `Tap Restore to get them back. If you deleted them on purpose, delete ${path} in the repository first.`,
+    );
+  }
 }
 
 function backupFiles(snapshot: DataSnapshot): Map<string, Uint8Array> {
@@ -176,6 +240,7 @@ export async function backUpToGitHub(settings: BackupSettings): Promise<'saved' 
   const { token } = settings;
   const head = await readHead(token, settings.repo, true);
   const files = backupFiles(store.snapshot());
+  await refuseEmptyOverwrite(head, files);
   const photos = await allPhotos();
   const wanted = new Set<string>();
   for (const [id, blob] of photos) {
@@ -224,13 +289,9 @@ export async function backUpToGitHub(settings: BackupSettings): Promise<'saved' 
 export async function fetchGitHubBackup(settings: BackupSettings) {
   const { token } = settings;
   const head = await readHead(token, settings.repo, false);
-  if (!head.files.has('recipes.json')) throw new Error('There’s no backup in this repository yet.');
-  const readJson = async (path: string): Promise<unknown> => {
-    const sha = head.files.get(path);
-    if (!sha) return undefined;
-    const blob = await gh<{ content: string }>(token, `${head.base}/git/blobs/${sha}`);
-    return JSON.parse(new TextDecoder().decode(fromBase64(blob.content)));
-  };
+  if (!head?.files.has('recipes.json'))
+    throw new Error('There’s no backup in this repository yet.');
+  const readJson = (path: string) => readJsonFile(token, head, path);
   const [recipes, products, sections, meals, list, settingsFile] = await Promise.all([
     readJson('recipes.json'),
     readJson('products.json'),
@@ -267,26 +328,13 @@ export async function fetchGitHubBackup(settings: BackupSettings) {
 
 // File export and import, as a safety net that needs no account.
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}
-
 export async function exportFile() {
   const photos: Record<string, string> = {};
   for (const [id, blob] of await allPhotos()) photos[id] = await blobToDataUrl(blob);
   const file = new Blob([JSON.stringify({ ...store.snapshot(), photos })], {
     type: 'application/json',
   });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(file);
-  link.download = `sanso-${nowISO().slice(0, 10)}.json`;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
+  downloadFile(file, `sanso-${nowISO().slice(0, 10)}.json`);
 }
 
 export async function readImportFile(file: File) {

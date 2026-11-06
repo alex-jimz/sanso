@@ -91,12 +91,26 @@ Typed one per line, the way you'd say them. `src/lib/ingredients.ts` reads:
 - A product has a name, shop section, shop (Aldi, Lidl or either), pack size (g, ml or pieces), price, link, how it's listed (Normal, Ask first, Never), an optional offer (price and end date), and the ingredient names it matches. Price per kg, litre or piece is calculated.
 - Ingredient names are matched to products by a normalised name ("Fresh Tomatoes" and "tomato" match), or by an alias learned when I link an item. An alias belongs to one product only.
 - **Sharing from Chrome:** Sanso is a share target (`share_target` in `vite.config.ts`). Sharing an aldi.ie or lidl.ie product page opens a new product with the name, shop, link and pack size filled in from the page title and URL (`src/lib/share.ts`). If the link is already known, it opens that product instead, to update the price or offer.
-- No scraping. aldi.ie blocks automated requests, and the app doesn't try to get around that. Revisit if a source that allows automated access turns up.
+- **aldi.ie helper:** a bookmarklet (`src/lib/aldiBookmarklet.js`, wrapped by `src/lib/aldiHelper.ts`, installed from Products > Get prices and photos from aldi.ie). Run from Chrome's address bar on an aldi.ie product, search or offers page, it reads the product numbers from the page's `/product/<slug>-<sku>` links, asks `api.aldi.ie/v2/products/<sku>` for each (up to 60, four at a time, from the user's own browser as the page does), and opens Sanso at `#/aldi?d=<JSON>`. The fragment never reaches a server.
+  - Sanso treats that data as untrusted (`src/lib/aldi.ts`): fields are validated one by one, photos must be https on `*.aldi.cx` or `*.aldi.ie`, links are rebuilt from a safe slug, and nothing is saved until I confirm on the review page.
+  - One new product opens the product form, to pick its section. Otherwise the review page lists known products (matched by Aldi number or saved link) with their changes, ticked, and new ones, unticked.
+  - Aldi sets price, pack size and photo; name, section, aliases and list mode stay mine. A was-price becomes an offer for 7 days, because Aldi doesn't say when a price drop ends. The regular price is the was-price.
+  - Aldi's field names are read defensively (`amountRelevantDisplay`, `wasPriceDisplay`, `comparisonDisplay`, `sellingSize`, `assets[].url`). They come from open-source scrapers, not from testing against the live site, so the review page has "Copy what aldi.ie sent" for fixing mismatches.
+  - No background or scheduled fetching: aldi.ie blocks automated requests, and the app doesn't try to get around that. Lidl isn't covered.
+- Product photos are shown from Aldi's image server (CSP `img-src https://*.aldi.cx`), not stored on the phone, so they may be missing offline. Shown in Products, the product form and shop mode.
+
+### Recipe files
+
+- More > Recipe files exports all recipes as schema.org Recipe JSON-LD, `{"@context": "https://schema.org", "@graph": [...]}`, with photos as data URLs (`src/lib/recipeFormat.ts`). Notes go in `description`, tags in `recipeCategory` and `keywords`, the score in `aggregateRating` out of 10, and each recipe gets `identifier: "sanso:<id>"`.
+- Import reads a Sanso export, any schema.org Recipe JSON, or the JSON-LD blocks of a saved web page. It adds recipes and never replaces any. Recipes with a title already in the book start unticked.
+- From other sources, only tags already in my tag list are kept, and ratings are ignored (they're the site's public rating, not mine). Photos that are only links aren't downloaded.
 
 ### Backups
 
 - **GitHub:** copies everything to a private repository using a fine-grained token that can only read and write that repository's contents (`src/lib/backup.svelte.ts`). Each backup is one commit with `recipes.json`, `products.json`, `sections.json`, `plan.json`, `list.json`, `settings.json` and `photos/`. Only files whose git hash changed are uploaded. It refuses to back up to a public repository.
 - Runs automatically 3 minutes after the last change, when the app goes to the background with changes pending, and when the phone comes back online. Restore replaces everything on the phone with the latest backup.
+- **Connecting** first reads what the repository holds (`inspectGitHubBackup`), without changing it. If it has a backup and the phone is empty (a new install), it offers to restore. If both have data, it asks whether to restore or replace the backup. Only a token change for the same repository skips the question.
+- A backup never replaces a `recipes.json` or `products.json` that has entries with an empty one (`refuseEmptyOverwrite`). That protects the backup from an empty phone, such as after Chrome's storage is cleared.
 - **File:** export everything, photos included, as one JSON file, and import it again.
 
 ## Data model
@@ -104,7 +118,7 @@ Typed one per line, the way you'd say them. `src/lib/ingredients.ts` reads:
 Types are in `src/lib/types.ts`. Changing them needs a migration in `src/lib/db.ts`, because existing phones and backups hold the old shape.
 
 - **Recipe:** id, title, photoId, tags, portions, prepMinutes, totalMinutes, score, ingredients (lines as typed), steps, notes, createdAt, updatedAt
-- **Product:** id, name, sectionId, shop, packSize, packUnit, price, url, listMode, aliases, offer (price, until), createdAt, updatedAt
+- **Product:** id, name, sectionId, shop, packSize, packUnit, price, url, sku, imageUrl, priceCheckedAt, listMode, aliases, offer (price, until), createdAt, updatedAt
 - **Section:** id, name, zone (ambient, fridge, freezer), order
 - **Meal:** id (`date:slot`), date, slot, recipeId, portions, state, note
 - **Shopping list:** mealIds, items, createdAt, shopping (in shop mode)
@@ -132,7 +146,7 @@ Ingredient lines are stored as text and parsed when needed, so the parser can im
 ## Development
 
 - Node 24, pinned in `.tool-versions`. Main commands: `npm run dev`, `npm run check`, `npm test`, `npm run build`, `npm run e2e`.
-- `npm run e2e` builds the app and drives it in a Pixel 7-sized Chromium inside the official Playwright Docker image, with networking turned off. It checks the main flows and writes screenshots to `test-results/`.
+- `npm run e2e` builds the app and drives it in a Pixel 7-sized Chromium inside the official Playwright Docker image, with networking turned off. It checks the main flows and writes screenshots to `test-results/`. `e2e/fakes.cjs` stands in for GitHub's git API and for aldi.ie (pages, product API, images), and backups are tested across fresh browser profiles as separate phones.
 - The dev and preview servers listen on 127.0.0.1 only.
 - Changes reach `main` only through pull requests, and merging one publishes it.
 - Commits use the GitHub noreply address, set in the repo's own git config.

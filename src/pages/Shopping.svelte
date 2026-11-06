@@ -10,6 +10,7 @@
   import { onMount } from 'svelte';
   import ItemSheet from '../components/ItemSheet.svelte';
   import MealSelectSheet from '../components/MealSelectSheet.svelte';
+  import ProductPhoto from '../components/ProductPhoto.svelte';
   import Sheet from '../components/Sheet.svelte';
   import { todayISO } from '../lib/dates';
   import { itemAmount } from '../lib/listView';
@@ -199,6 +200,7 @@
                 onclick={() => store.toggleDone(item.id)}
               >
                 <span class="check" class:on={item.done}><Check size={17} strokeWidth={3} /></span>
+                <ProductPhoto url={productOf(item)?.imageUrl} size={40} />
                 <span class="row-main">
                   <span class="row-title">{item.name}</span>
                   <span class="row-sub">

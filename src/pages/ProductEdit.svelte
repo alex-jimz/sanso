@@ -6,7 +6,8 @@
   import X from '@lucide/svelte/icons/x';
   import { untrack } from 'svelte';
   import SectionPicker from '../components/SectionPicker.svelte';
-  import { addDays, todayISO } from '../lib/dates';
+  import ProductPhoto from '../components/ProductPhoto.svelte';
+  import { addDays, formatDayMonth, todayISO } from '../lib/dates';
   import { formatPrice } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
   import { unitPrice } from '../lib/shopping';
@@ -23,14 +24,13 @@
   const shared = productId === 'new' ? ui.shared : null;
   ui.shared = null;
 
-  const base: Product = existing
-    ? $state.snapshot(existing)
-    : store.newProduct(shared?.name ?? '', {
-        shop: shared?.shop ?? 'any',
-        url: shared?.url,
-        packSize: shared?.packSize,
-        packUnit: shared?.packUnit,
-      });
+  const base: Product = existing ? $state.snapshot(existing) : newFromShared();
+
+  function newFromShared(): Product {
+    if (!shared) return store.newProduct('');
+    const { name, ...fields } = shared;
+    return store.newProduct(name, fields);
+  }
 
   const today = todayISO();
   let name = $state(base.name);
@@ -93,6 +93,7 @@
     }
     const size = parseDecimal(packSize);
     const offer = parseDecimal(offerPrice);
+    const newPrice = parseDecimal(price);
     const product: Product = {
       ...base,
       name: name.trim(),
@@ -100,7 +101,9 @@
       shop,
       packSize: size && size > 0 ? size : undefined,
       packUnit: size && size > 0 ? packUnit : undefined,
-      price: parseDecimal(price),
+      price: newPrice,
+      // A price typed by hand is no longer the one read from aldi.ie.
+      priceCheckedAt: newPrice === base.price ? base.priceCheckedAt : undefined,
       url: safeUrl(url),
       listMode,
       aliases,
@@ -141,10 +144,21 @@
   </div>
 
   <form class="stack" onsubmit={(e) => (e.preventDefault(), save())}>
+    {#if base.imageUrl}
+      <div class="photo"><ProductPhoto url={base.imageUrl} size={120} /></div>
+    {/if}
+
     {#if shared}
       <p class="shared">
-        Shared from {shared.shop === 'aldi' ? 'Aldi' : shared.shop === 'lidl' ? 'Lidl' : 'the web'}.
-        Check the name and pack size, then add the price.
+        {#if shared.priceCheckedAt}
+          From aldi.ie. Pick where it is in the shop, and check the name.
+        {:else}
+          Shared from {shared.shop === 'aldi'
+            ? 'Aldi'
+            : shared.shop === 'lidl'
+              ? 'Lidl'
+              : 'the web'}. Check the name and pack size, then add the price.
+        {/if}
       </p>
     {/if}
 
@@ -197,7 +211,16 @@
           <span class="euro">€</span>
           <input class="input money" inputmode="decimal" bind:value={price} placeholder="1.89" />
         </span>
-        {#if per}<span class="hint">{formatPrice(per.value)} per {per.per}</span>{/if}
+        {#if per || base.priceCheckedAt}
+          <span class="hint">
+            {[
+              per ? `${formatPrice(per.value)} per ${per.per}` : '',
+              base.priceCheckedAt ? `from aldi.ie on ${formatDayMonth(base.priceCheckedAt)}` : '',
+            ]
+              .filter(Boolean)
+              .join(', ')}
+          </span>
+        {/if}
       </label>
     </div>
 
@@ -298,6 +321,14 @@
 <style>
   form {
     padding-top: 6px;
+  }
+
+  .photo {
+    display: grid;
+    place-items: center;
+    padding: 10px;
+    border-radius: var(--radius);
+    background: #fff;
   }
 
   .shared {

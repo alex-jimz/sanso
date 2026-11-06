@@ -23,7 +23,9 @@ function openSharedPage() {
   history.replaceState(history.state, '', `${location.pathname}${location.hash}`);
   const shared = parseShare(params);
   if (!shared) return;
-  const known = shared.url ? store.products.find((p) => p.url === shared.url) : undefined;
+  const known = store.products.find(
+    (p) => (!!shared.url && p.url === shared.url) || (!!shared.sku && p.sku === shared.sku),
+  );
   if (known) {
     router.go(`/more/products/${known.id}`);
     showToast('You already have this product. Update its price or offer here.');
