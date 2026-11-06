@@ -14,10 +14,27 @@ export type SharedProduct = Pick<Product, 'name' | 'shop'> &
     >
   >;
 
-const packPattern = /(?:(\d+)\s?x\s?)?(\d+(?:[.,]\d+)?)\s?(kg|g|ml|cl|l|litre|litres)\b/i;
+/** Weight and volume units as shops write them, longest spellings first. */
+export const unitWords =
+  'kilograms?|kilos?|kgm|kgs?|grams?|grammes?|grm|gr|g|millilitres?|milliliters?|mlt|mls?|cl|litres?|liters?|ltrs?|lt|l';
+const packPattern = new RegExp(
+  `(?:(\\d+)\\s?x\\s?)?(\\d+(?:[.,]\\d+)?)\\s?(${unitWords})(?![\\p{L}\\d])`,
+  'iu',
+);
 const countPattern = /\b(\d+)\s?(each|pack|pk|pcs|pieces)\b/i;
 
-/** "500g", "1.5 KG", "6 x 330ml" (1980 ml) or "4 Each" (4 pieces). */
+/** How many g or ml one of `unit` is: "kg" -> 1000 g, "cl" -> 10 ml, "Ltr" -> 1000 ml. */
+export function unitFactor(unit: string): { factor: number; packUnit: PackUnit } | undefined {
+  const u = unit.toLowerCase();
+  if (/^(kilo|kg)/.test(u)) return { factor: 1000, packUnit: 'g' };
+  if (/^(gr|g)/.test(u)) return { factor: 1, packUnit: 'g' };
+  if (/^(millil|ml)/.test(u)) return { factor: 1, packUnit: 'ml' };
+  if (u === 'cl') return { factor: 10, packUnit: 'ml' };
+  if (/^l/.test(u)) return { factor: 1000, packUnit: 'ml' };
+  return undefined;
+}
+
+/** "500g", "1.5 KG", "1 Ltr", "6 x 330ml" (1980 ml) or "4 Each" (4 pieces). */
 export function parsePackSize(text: string): { packSize: number; packUnit: PackUnit } | undefined {
   const m = packPattern.exec(text);
   if (!m) {
@@ -26,15 +43,13 @@ export function parsePackSize(text: string): { packSize: number; packUnit: PackU
     return n > 0 ? { packSize: n, packUnit: 'pcs' } : undefined;
   }
   const value = parseDecimal(m[2]!);
-  if (!value) return undefined;
+  const unit = unitFactor(m[3]!);
+  if (!value || !unit) return undefined;
   const times = m[1] ? Number(m[1]) : 1;
-  const unit = m[3]!.toLowerCase();
-  const round = (n: number) => Math.round(n * 1000) / 1000;
-  if (unit === 'kg') return { packSize: round(times * value * 1000), packUnit: 'g' };
-  if (unit === 'g') return { packSize: round(times * value), packUnit: 'g' };
-  if (unit === 'cl') return { packSize: round(times * value * 10), packUnit: 'ml' };
-  if (unit === 'ml') return { packSize: round(times * value), packUnit: 'ml' };
-  return { packSize: round(times * value * 1000), packUnit: 'ml' };
+  return {
+    packSize: Math.round(times * value * unit.factor * 1000) / 1000,
+    packUnit: unit.packUnit,
+  };
 }
 
 /** Aldi's product number from an aldi.ie product link, e.g. …/cucina-penne-000000000000282766. */

@@ -11,7 +11,7 @@
 
 import { addDays } from './dates';
 import { packLabel } from './listView';
-import { aldiSku, parsePackSize } from './share';
+import { aldiSku, parsePackSize, unitFactor, unitWords } from './share';
 import type { Offer, PackUnit, Product } from './types';
 
 export interface AldiItem {
@@ -79,18 +79,39 @@ function priceOf(price: Record<string, unknown>): { price?: number; wasPrice?: n
   return { price: now, wasPrice: was && now && was > now ? was : undefined };
 }
 
-/** Works out the pack size from "€3.78/1 KG" when the size itself is missing. */
-function packFromUnitPrice(price: number | undefined, unitPrice: unknown) {
-  const m = /([\d.,]+)\s*(?:\/|per)\s*(\d+(?:[.,]\d+)?)?\s*(kg|g|l|ml)\b/i.exec(text(unitPrice));
+/** "€3.78/1 KG", "€1.15 per litre" or "€0.12/100 ML". */
+const unitPricePattern = new RegExp(
+  `€\\s?(\\d+(?:[.,]\\d{1,2})?)\\s*(?:\\/|per)\\s*(\\d+(?:[.,]\\d+)?)?\\s*(${unitWords})(?![\\p{L}\\d])`,
+  'iu',
+);
+
+/** Works out the pack size from the price per kg or litre, when the size itself is missing. */
+function packFromUnitPrice(price: number | undefined, unitPrice: string) {
+  const m = unitPricePattern.exec(unitPrice.includes('€') ? unitPrice : `€${unitPrice}`);
   const perPrice = m ? parseEuro(m[1]) : undefined;
-  if (!m || !price || !perPrice) return undefined;
+  const unit = m ? unitFactor(m[3]!) : undefined;
+  if (!m || !price || !perPrice || !unit) return undefined;
   const amount = Number((m[2] ?? '1').replace(',', '.'));
-  const unit = m[3]!.toLowerCase();
-  const factor = unit === 'kg' || unit === 'l' ? 1000 : 1;
-  const size = Math.round((price / perPrice) * amount * factor);
-  return size > 0
-    ? { packSize: size, packUnit: (unit === 'l' || unit === 'ml' ? 'ml' : 'g') as PackUnit }
-    : undefined;
+  const size = Math.round((price / perPrice) * amount * unit.factor);
+  return size > 0 ? { packSize: size, packUnit: unit.packUnit } : undefined;
+}
+
+/**
+ * The pack size printed on the aldi.ie page, e.g. "Cowbell Fresh Milk 1 l €1.15 (€1.15/1 L)".
+ * Prices per kg or litre are taken out first, so their "1 L" isn't read as the pack.
+ */
+function packFromPage(pageText: string) {
+  return parsePackSize(withoutUnitPrices(pageText));
+}
+
+/** The first plain price on the page, skipping prices per kg or litre. */
+function priceFromPage(pageText: string): number | undefined {
+  return parseEuro(/€\s?\d+(?:[.,]\d{1,2})?/.exec(withoutUnitPrices(pageText))?.[0]);
+}
+
+/** Removes "€1.15/1 L", "€0.25/1 Each" and "€1.15 per litre". */
+function withoutUnitPrices(pageText: string): string {
+  return pageText.replace(/€\s?[\d.,]+\s*(?:\/|per\b)[^€)]*/giu, ' ');
 }
 
 function imageOf(raw: unknown, slug: string): string | undefined {
@@ -122,14 +143,31 @@ function readItem(raw: Record<string, unknown>): AldiItem | null {
     ? `https://www.aldi.ie/product/${slug.toLowerCase()}-${sku}`
     : `https://www.aldi.ie/product/${sku}`;
 
+  // What the page itself shows next to the product, read by the helper in case
+  // the API leaves a detail out.
+  const pageText = text(raw.pageText, 400);
   const price = isObject(raw.price) ? priceOf(raw.price) : { price: parseEuro(raw.priceDisplay) };
-  const sizeText = [raw.sellingSize, raw.size, raw.packageSize, raw.weight]
-    .map((v) => text(v))
-    .find(Boolean);
+  if (price.price === undefined && pageText) price.price = priceFromPage(pageText);
+
+  // The API's own size fields first, then anything else that looks like one.
+  const sizeFields = [raw.sellingSize, raw.size, raw.packageSize, raw.weight, raw.volume].concat(
+    Object.entries(raw)
+      .filter(([key]) => /size|weight|volume/i.test(key))
+      .map(([, value]) => value),
+  );
+  const sizes = sizeFields
+    .map((v) => (typeof v === 'number' ? '' : text(v)))
+    .filter(Boolean)
+    .map((s) => parsePackSize(s));
+  const unitPrices = [
+    isObject(raw.price) ? text(raw.price.comparisonDisplay) : '',
+    pageText,
+  ].filter(Boolean);
   const pack =
-    (sizeText ? parsePackSize(sizeText) : undefined) ??
+    sizes.find(Boolean) ??
+    (pageText ? packFromPage(pageText) : undefined) ??
     parsePackSize(plainName) ??
-    (isObject(raw.price) ? packFromUnitPrice(price.price, raw.price.comparisonDisplay) : undefined);
+    unitPrices.map((u) => packFromUnitPrice(price.price, u)).find(Boolean);
 
   return {
     sku,

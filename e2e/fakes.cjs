@@ -153,7 +153,26 @@ const aldiProducts = {
     price: { amount: 249, amountRelevantDisplay: '€2.49', comparisonDisplay: '€6.23/1 KG' },
     assets: [{ url: imageTemplate('cheddar') }],
   },
+  // The API doesn't answer for this one, so the helper has to read the page.
+  '000000000000400333': {
+    sku: '000000000000400333',
+    name: 'Fresh Milk',
+    brandName: 'COWBELL',
+    urlSlugText: 'cowbell-fresh-milk',
+    pageOnly: true,
+    shownSize: '1 l',
+    price: { amount: 115, amountRelevantDisplay: '€1.15', comparisonDisplay: '€1.15/1 L' },
+  },
 };
+
+/** The product block aldi.ie shows on product pages and in product lists. */
+function productBlock(p, heading) {
+  const name = heading
+    ? `<h1>${p.name}</h1>`
+    : `<a href="${productLink(p)}">${p.brandName} ${p.name}</a>`;
+  return `<div class="tile"><div>${p.brandName}</div>${name}<div>${p.shownSize ?? p.sellingSize ?? ''}</div>
+    <div>${p.price.amountRelevantDisplay}</div><div>(${p.price.comparisonDisplay})</div></div>`;
+}
 
 /** Lets the test change a price, as a price drop would. */
 function setAldiPrice(sku, cents, wasCents) {
@@ -177,7 +196,9 @@ async function handleAldi(route) {
     const sku = /^\/v2\/products\/(\d+)$/.exec(url.pathname)?.[1];
     const cors = { 'access-control-allow-origin': 'https://www.aldi.ie' };
     const product = aldiProducts[sku];
-    return route.fulfill(product ? json({ data: product }, 200, cors) : json({}, 404, cors));
+    return route.fulfill(
+      product && !product.pageOnly ? json({ data: product }, 200, cors) : json({}, 404, cors),
+    );
   }
   if (url.hostname === 'dm.emea.cms.aldi.cx') {
     const colour = /eggs/.test(url.pathname)
@@ -195,11 +216,19 @@ async function handleAldi(route) {
     const p = aldiProducts[sku];
     return route.fulfill({
       contentType: 'text/html',
-      body: aldiPage(`${p.brandName} ${p.name}`, `<h1>${p.name}</h1>`),
+      body: aldiPage(
+        `${p.brandName} ${p.name}`,
+        `<main>${productBlock(p, true)}</main><section><h2>You may also like</h2>${Object.values(
+          aldiProducts,
+        )
+          .filter((other) => other !== p)
+          .map((other) => productBlock(other, false))
+          .join('')}</section>`,
+      ),
     });
   }
   const links = Object.values(aldiProducts)
-    .map((p) => `<li><a href="${productLink(p)}">${p.brandName} ${p.name}</a></li>`)
+    .map((p) => `<li>${productBlock(p, false)}</li>`)
     .join('');
   return route.fulfill({
     contentType: 'text/html',

@@ -20,6 +20,8 @@ export function helperBookmark(app = appUrl()): string {
     .replace('__SANSO_APP__', app)
     .split('\n')
     .map((line) => line.trim())
+    // Joined onto one line, a // comment would hide the code after it.
+    .filter((line) => !line.startsWith('//'))
     .join(' ');
   return `javascript:${encodeURIComponent(code)}`;
 }
