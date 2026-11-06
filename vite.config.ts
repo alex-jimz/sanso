@@ -1,5 +1,7 @@
 /// <reference types="vitest/config" />
+import { readFile } from 'node:fs/promises';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { minify } from 'terser';
 import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -40,6 +42,25 @@ function csp(): Plugin {
   };
 }
 
+// The aldi.ie helper is installed as a javascript: bookmark, and Chrome on
+// Android may not run long ones, so it's shipped minified.
+function minifiedBookmarklet(): Plugin {
+  return {
+    name: 'minified-bookmarklet',
+    enforce: 'pre',
+    async load(id) {
+      if (!/aldiBookmarklet\.js\?raw$/.test(id)) return;
+      const file = id.replace(/\?raw$/, '');
+      this.addWatchFile(file);
+      const { code } = await minify(await readFile(file, 'utf8'), {
+        ecma: 2020,
+        format: { comments: false },
+      });
+      return `export default ${JSON.stringify(code)};`;
+    },
+  };
+}
+
 export default defineConfig({
   base,
   define: {
@@ -50,6 +71,7 @@ export default defineConfig({
   server: { host: '127.0.0.1' },
   preview: { host: '127.0.0.1' },
   plugins: [
+    minifiedBookmarklet(),
     svelte(),
     csp(),
     VitePWA({

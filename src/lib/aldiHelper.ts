@@ -23,5 +23,8 @@ export function helperBookmark(app = appUrl()): string {
     // Joined onto one line, a // comment would hide the code after it.
     .filter((line) => !line.startsWith('//'))
     .join(' ');
-  return `javascript:${encodeURIComponent(code)}`;
+  // Only what a URL can't hold as it is gets escaped, which keeps the bookmark
+  // much shorter than encodeURIComponent would. Chrome decodes it before running.
+  const escaped = code.replace(/[^\w!$&'()*+,\-./:;=?@[\]^{|}~]/gu, (c) => encodeURIComponent(c));
+  return `javascript:${escaped}`;
 }
