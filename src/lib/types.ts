@@ -44,6 +44,12 @@ export interface Product {
   /** Price of one pack, in euro. */
   price?: number;
   url?: string;
+  /** Aldi's product number, the long number at the end of an aldi.ie product link. */
+  sku?: string;
+  /** Product photo on Aldi's image server. */
+  imageUrl?: string;
+  /** Day the price was last read from aldi.ie, YYYY-MM-DD. */
+  priceCheckedAt?: string;
   listMode: ListMode;
   /** Normalised ingredient names that mean this product. */
   aliases: string[];

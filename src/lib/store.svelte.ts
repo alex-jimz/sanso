@@ -16,6 +16,7 @@ import {
 import { defaultSections, defaultSettings } from './defaults';
 import { capitalize, normalizeName } from './ingredients';
 import { forgetPhotoUrls } from './photos';
+import type { ImportedRecipe } from './recipeFormat';
 import { emptyAmounts, formatAmounts } from './quantity';
 import { buildItems, mergeDecisions, productMatcher } from './shopping';
 import type {
@@ -154,14 +155,18 @@ class Store {
   // Recipes
 
   /** `photo`: a new Blob replaces the photo, null removes it, undefined keeps it. */
-  async saveRecipe(input: Recipe, photo?: Blob | null): Promise<Recipe> {
+  async saveRecipe(
+    input: Recipe,
+    photo?: Blob | null,
+    options: { keepCreatedAt?: boolean } = {},
+  ): Promise<Recipe> {
     const recipe = cleanRecipe(plain(input));
     const previous = this.recipeById.get(recipe.id);
     const oldPhotoId = previous?.photoId;
     if (photo) recipe.photoId = newId();
     else if (photo === null) recipe.photoId = undefined;
     recipe.updatedAt = nowISO();
-    if (!previous) recipe.createdAt = recipe.updatedAt;
+    if (!previous && !options.keepCreatedAt) recipe.createdAt = recipe.updatedAt;
 
     const i = this.recipes.findIndex((r) => r.id === recipe.id);
     if (i >= 0) this.recipes[i] = recipe;
@@ -195,6 +200,23 @@ class Store {
       await Promise.all([...removed].map((mealId) => deleteRecord('meals', mealId)));
     });
     if (this.list) await this.setListMeals(this.list.mealIds.filter((m) => !removed.has(m)));
+  }
+
+  /** Adds recipes from an import file as new recipes, and any new tags they bring. */
+  async addImportedRecipes(items: { recipe: ImportedRecipe; photo?: Blob }[], newTags: string[]) {
+    const tags = newTags.filter((t) => !this.settings.tags.includes(t));
+    if (tags.length) await this.updateSettings({ tags: [...this.settings.tags, ...tags] });
+    for (const { recipe: imported, photo } of items) {
+      const now = nowISO();
+      const { photo: _photo, linkedPhoto: _linked, fromSanso: _sanso, ...fields } = imported;
+      const recipe: Recipe = {
+        ...fields,
+        id: newId(),
+        createdAt: imported.createdAt ?? now,
+        updatedAt: now,
+      };
+      await this.saveRecipe(recipe, photo, { keepCreatedAt: true });
+    }
   }
 
   // Products

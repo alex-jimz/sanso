@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import CloudUpload from '@lucide/svelte/icons/cloud-upload';
+  import FileText from '@lucide/svelte/icons/file-text';
   import Package from '@lucide/svelte/icons/package';
   import Store from '@lucide/svelte/icons/store';
   import Stepper from '../components/Stepper.svelte';
@@ -62,6 +63,16 @@
         <span class="row-main">
           <span class="row-title">Shop sections</span>
           <span class="row-sub">The order you walk through the shop</span>
+        </span>
+        <ChevronRight size={20} class="chev" />
+      </a>
+    </li>
+    <li>
+      <a class="row" href="#/more/recipe-files" onclick={(e) => open(e, '/more/recipe-files')}>
+        <span class="icon"><FileText size={20} /></span>
+        <span class="row-main">
+          <span class="row-title">Recipe files</span>
+          <span class="row-sub">Export or import recipes</span>
         </span>
         <ChevronRight size={20} class="chev" />
       </a>

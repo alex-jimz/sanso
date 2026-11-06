@@ -5,6 +5,8 @@
   import { applyUpdate, pwa } from './lib/pwa.svelte';
   import { router } from './lib/router.svelte';
   import { store } from './lib/store.svelte';
+  import AldiHelper from './pages/AldiHelper.svelte';
+  import AldiImport from './pages/AldiImport.svelte';
   import Backup from './pages/Backup.svelte';
   import Cook from './pages/Cook.svelte';
   import More from './pages/More.svelte';
@@ -13,13 +15,15 @@
   import Products from './pages/Products.svelte';
   import RecipeDetail from './pages/RecipeDetail.svelte';
   import RecipeEdit from './pages/RecipeEdit.svelte';
+  import RecipeFiles from './pages/RecipeFiles.svelte';
   import Recipes from './pages/Recipes.svelte';
   import Sections from './pages/Sections.svelte';
   import Shopping from './pages/Shopping.svelte';
 
   const segments = $derived(router.route.segments);
   const [top = 'recipes', second, third] = $derived(segments);
-  const topLevel = $derived(segments.length <= 1);
+  // #/aldi is a one-off review page, not a tab.
+  const topLevel = $derived(segments.length <= 1 && top !== 'aldi');
   const iconUrl = `${import.meta.env.BASE_URL}icon.svg`;
 </script>
 
@@ -57,6 +61,12 @@
       <Sections />
     {:else if top === 'more' && second === 'backup'}
       <Backup />
+    {:else if top === 'more' && second === 'recipe-files'}
+      <RecipeFiles />
+    {:else if top === 'more' && second === 'aldi'}
+      <AldiHelper />
+    {:else if top === 'aldi'}
+      <AldiImport />
     {:else if top === 'more'}
       <More />
     {:else}

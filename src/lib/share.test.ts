@@ -14,9 +14,16 @@ describe('parseShare', () => {
       name: 'Specially Selected Irish Beef Mince',
       url: 'https://www.aldi.ie/product/specially-selected-irish-beef-mince-000000000000315027',
       shop: 'aldi',
+      sku: '000000000000315027',
       packSize: 500,
       packUnit: 'g',
     });
+  });
+
+  it('reads multipacks and counts', () => {
+    expect(parsePackSize('Sparkling Water 6 x 330ml')).toEqual({ packSize: 1980, packUnit: 'ml' });
+    expect(parsePackSize('12 Each')).toEqual({ packSize: 12, packUnit: 'pcs' });
+    expect(parsePackSize('1 KG')).toEqual({ packSize: 1000, packUnit: 'g' });
   });
 
   it('finds the link inside the text and names the product from it', () => {

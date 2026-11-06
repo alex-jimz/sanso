@@ -13,17 +13,21 @@
     exportFile,
     fetchGitHubBackup,
     hasUnsavedChanges,
+    inspectGitHubBackup,
     readImportFile,
     runBackup,
+    type BackupSummary,
   } from '../lib/backup.svelte';
   import { timeAgo } from '../lib/dates';
   import { router } from '../lib/router.svelte';
   import { store } from '../lib/store.svelte';
-  import { askConfirm, showToast } from '../lib/ui.svelte';
+  import type { BackupSettings } from '../lib/types';
+  import { askChoice, askConfirm, showToast } from '../lib/ui.svelte';
 
   let repo = $state(store.settings.backup?.repo ?? '');
   let token = $state('');
   let editing = $state(!backupConfigured());
+  let connecting = $state(false);
   let restoring = $state(false);
   let persisted = $state<boolean | null>(null);
   let usage = $state('');
@@ -37,6 +41,25 @@
     if (estimate?.usage) usage = `${(estimate.usage / 1024 / 1024).toFixed(1)} MB`;
   });
 
+  const savedAtFormat = new Intl.DateTimeFormat('en-IE', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  function count(n: number, one: string, many: string) {
+    return `${n} ${n === 1 ? one : many}`;
+  }
+
+  function describe(summary: BackupSummary) {
+    return `a backup from ${savedAtFormat.format(new Date(summary.savedAt))} with ${count(summary.recipes, 'recipe', 'recipes')} and ${count(summary.products, 'product', 'products')}`;
+  }
+
+  /**
+   * Before the first backup to a repository, looks at what it already holds,
+   * so a new install restores the backup instead of overwriting it.
+   */
   async function connect() {
     const cleanRepo = repo
       .trim()
@@ -52,7 +75,46 @@
       showToast('Paste the token first.');
       return;
     }
-    await store.setBackup({ repo: cleanRepo, token: cleanToken });
+    const target: BackupSettings = { repo: cleanRepo, token: cleanToken };
+    // Same repository as before, only a new token: carry on backing up.
+    const sameRepo = backup?.repo === cleanRepo && !!backup.lastBackupAt;
+
+    connecting = true;
+    let remote: BackupSummary | null;
+    try {
+      remote = await inspectGitHubBackup(target);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Couldn’t reach the repository.');
+      return;
+    } finally {
+      connecting = false;
+    }
+
+    if (remote && !sameRepo) {
+      const phoneEmpty = !store.recipes.length && !store.products.length && !store.meals.length;
+      if (phoneEmpty) {
+        const ok = await askConfirm({
+          title: 'Restore your backup?',
+          message: `This repository has ${describe(remote)}. Restore it to this phone?`,
+          confirmLabel: 'Restore',
+        });
+        if (ok) await connectAndRestore(target);
+        return;
+      }
+      const choice = await askChoice({
+        title: 'This repository already has a backup',
+        message:
+          `It has ${describe(remote)}. This phone has ${count(store.recipes.length, 'recipe', 'recipes')} and ${count(store.products.length, 'product', 'products')}.\n\n` +
+          'Restoring replaces everything on this phone. Replacing the backup keeps the old one in the repository’s history.',
+        secondaryLabel: 'Restore the backup to this phone',
+        confirmLabel: 'Replace the backup with this phone',
+        danger: true,
+      });
+      if (choice === 'secondary') await connectAndRestore(target);
+      if (choice !== 'confirm') return;
+    }
+
+    await store.setBackup(target);
     token = '';
     const result = await runBackup();
     if (result === 'failed') {
@@ -61,6 +123,13 @@
     }
     editing = false;
     showToast('Backup is set up. Sanso backs up a few minutes after each change.');
+  }
+
+  async function connectAndRestore(target: BackupSettings) {
+    await store.setBackup(target);
+    token = '';
+    editing = false;
+    await restoreLatest();
   }
 
   async function backUpNow() {
@@ -79,13 +148,18 @@
       confirmLabel: 'Restore',
       danger: true,
     });
-    if (!ok) return;
+    if (ok) await restoreLatest();
+  }
+
+  async function restoreLatest() {
+    const settings = store.settings.backup;
+    if (!settings) return;
     restoring = true;
     try {
-      const { data, photos } = await fetchGitHubBackup(backup);
+      const { data, photos } = await fetchGitHubBackup(settings);
       await store.restore(data, photos);
       await store.setBackup({
-        ...backup,
+        ...settings,
         lastBackupAt: store.meta.changedAt,
         lastError: undefined,
       });
@@ -210,10 +284,10 @@
         <button
           class="btn btn-primary"
           type="button"
-          disabled={backupStatus.running}
+          disabled={connecting || backupStatus.running}
           onclick={connect}
         >
-          {backupStatus.running ? 'Connecting…' : 'Save and back up'}
+          {connecting || backupStatus.running ? 'Connecting…' : 'Connect'}
         </button>
       </div>
     </div>

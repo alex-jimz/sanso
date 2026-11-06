@@ -13,12 +13,16 @@ export interface ToastAction {
   run: () => void;
 }
 
+export type ConfirmAnswer = 'confirm' | 'secondary' | null;
+
 export interface ConfirmRequest {
   title: string;
   message?: string;
   confirmLabel: string;
   danger?: boolean;
-  resolve: (ok: boolean) => void;
+  /** A second way to go ahead, shown above the main button. */
+  secondaryLabel?: string;
+  resolve: (answer: ConfirmAnswer) => void;
 }
 
 class Ui {
@@ -44,7 +48,18 @@ export function hideToast() {
   ui.toast = null;
 }
 
-export function askConfirm(request: Omit<ConfirmRequest, 'resolve'>): Promise<boolean> {
+export function askConfirm(
+  request: Omit<ConfirmRequest, 'resolve' | 'secondaryLabel'>,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    ui.confirm = { ...request, resolve: (answer) => resolve(answer === 'confirm') };
+  });
+}
+
+/** Like askConfirm, with two ways to go ahead. Resolves to null on Cancel. */
+export function askChoice(
+  request: Omit<ConfirmRequest, 'resolve'> & { secondaryLabel: string },
+): Promise<ConfirmAnswer> {
   return new Promise((resolve) => {
     ui.confirm = { ...request, resolve };
   });

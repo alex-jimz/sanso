@@ -4,6 +4,7 @@ const fs = require('fs');
 const { chromium, devices } = require('playwright-core');
 const { start } = require('./server.cjs');
 const { seed, testPhoto } = require('./seed.cjs');
+const { aldiProducts, fakeGitHub, installAldi, productLink, setAldiPrice } = require('./fakes.cjs');
 
 const BASE = 'http://127.0.0.1:4173/sanso/';
 const OUT = '/out';
@@ -218,7 +219,7 @@ async function run(page) {
   await page.getByRole('link', { name: /Backup/ }).click();
   await page.getByRole('heading', { name: 'Private GitHub repository' }).waitFor();
   check(
-    await page.getByRole('button', { name: 'Save and back up' }).isVisible(),
+    await page.getByRole('button', { name: 'Connect', exact: true }).isVisible(),
     'the backup page offers the GitHub setup',
   );
   await page.getByRole('button', { name: 'Back', exact: true }).click();
@@ -255,38 +256,294 @@ async function run(page) {
     'and the pack size',
   );
   await shot(page, '12 Shared product');
+  await page.getByRole('button', { name: 'Cancel' }).click();
 
+  await aldi(page);
+  await recipeFiles(page);
+  await collectCsp(page);
+}
+
+async function collectCsp(page) {
   const csp = await page.evaluate(() => window.__csp ?? []);
   for (const violation of csp) problems.push(`CSP violation: ${violation}`);
 }
 
-async function main() {
-  const server = await start();
-  const browser = await chromium.launch();
+/** Waits for a toast with this text. */
+async function seeToast(page, text) {
+  try {
+    await page.locator('.toast').filter({ hasText: text }).waitFor();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Runs the aldi.ie helper on the aldi.ie page that is open, as tapping the bookmark would. */
+async function runHelper(page, bookmark) {
+  await page.addScriptTag({ content: decodeURIComponent(bookmark.slice('javascript:'.length)) });
+  await page.waitForURL((url) => url.href.startsWith(BASE));
+}
+
+async function aldi(page) {
+  await page.goto(`${BASE}#/more/products`);
+  await page.getByRole('link', { name: /Get prices and photos from aldi.ie/ }).click();
+  await page.getByRole('heading', { name: 'Prices from aldi.ie' }).waitFor();
+  await page.getByRole('button', { name: 'Show the helper’s text' }).click();
+  const bookmark = await page.locator('textarea.code').inputValue();
+  check(bookmark.startsWith('javascript:'), 'the helper page shows the bookmark');
+  await shot(page, '13 Aldi helper');
+
+  // A product page for something Sanso doesn't know yet opens the product form.
+  await page.goto(`https://www.aldi.ie${productLink(aldiProducts['000000000000282766'])}`);
+  await runHelper(page, bookmark);
+  await page.getByRole('heading', { name: 'New product' }).waitFor();
+  check(
+    (await page.getByPlaceholder('Basmati rice').inputValue()) === 'Cucina Penne Pasta',
+    'the helper fills in the brand and name',
+  );
+  check(
+    (await page.getByPlaceholder('500', { exact: true }).inputValue()) === '1000',
+    'and the pack size',
+  );
+  check((await page.getByPlaceholder('1.89').inputValue()) === '0.99', 'and the price');
+  await page.locator('.photo img').waitFor();
+  await page.getByRole('radio', { name: 'Pasta, rice & grains' }).click();
+  await shot(page, '14 From aldi.ie, one product');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  check(await seeToast(page, 'Cucina Penne Pasta added'), 'the new product is saved');
+
+  // A week later the penne drops in price, and the offers page has two new products.
+  setAldiPrice('000000000000282766', 79, 99);
+  await page.goto('https://www.aldi.ie/products/super-savers');
+  await runHelper(page, bookmark);
+  await page.getByRole('heading', { name: 'From aldi.ie' }).waitFor();
+  await page.locator('.row img').first().waitFor();
+  const known = page.locator('.list').first();
+  check(
+    (await known.innerText()).includes('On offer at €0.79'),
+    'a price drop on a known product shows as an offer',
+  );
+  check(
+    (await page.locator('.row[aria-pressed=true]').count()) === 1,
+    'only known products start ticked',
+  );
+  await page.locator('.row').filter({ hasText: 'Farmdale Irish Free Range Eggs' }).click();
+  await shot(page, '15 From aldi.ie, offers page');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  check(await seeToast(page, 'Updated 1, added 1'), 'saving updates one product and adds one');
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+  check(
+    (await page.locator('.row').filter({ hasText: 'Cucina Penne Pasta' }).innerText()).includes(
+      '€0.79',
+    ),
+    'the products list shows the offer price',
+  );
+  const photos = await page
+    .locator('img.product-photo')
+    .evaluateAll((imgs) => imgs.filter((img) => img.complete && img.naturalWidth > 0).length);
+  check(photos === 2, 'the products list shows the two Aldi photos');
+  await page.locator('.row').filter({ hasText: 'Farmdale' }).scrollIntoViewIfNeeded();
+  await shot(page, '16 Products with photos');
+
+  // A link to #/aldi made by anyone else only ever shows a review page.
+  await page.goto(`${BASE}#/aldi?d=${encodeURIComponent('{"v":1,"items":[{"sku":"1"}]}')}`);
+  await page.getByRole('heading', { name: 'Nothing to add' }).waitFor();
+  check(
+    !(await page.getByRole('button', { name: 'Save' }).isEnabled()),
+    'a link with no usable products can’t save anything',
+  );
+}
+
+async function recipeFiles(page) {
+  await page.goto(`${BASE}#/more`);
+  await page.getByRole('link', { name: /Recipe files/ }).click();
+  await page.getByRole('heading', { name: 'Recipe files' }).waitFor();
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Export recipes' }).click(),
+  ]);
+  const exported = fs.readFileSync(await download.path());
+  const doc = JSON.parse(exported.toString('utf8'));
+  check(
+    doc['@context'] === 'https://schema.org' && doc['@graph'].length === 8,
+    'the export has all 8 recipes as schema.org',
+  );
+  const curry = doc['@graph'].find((r) => r.name === 'Chickpea curry');
+  check(/^data:image\//.test(curry?.image ?? ''), 'with the photo inlined');
+
+  const input = page.locator('input[type=file]');
+  await input.setInputFiles({
+    name: download.suggestedFilename(),
+    mimeType: 'application/json',
+    buffer: exported,
+  });
+  await page.getByRole('heading', { name: 'Found 8 recipes' }).waitFor();
+  check(
+    (await page.getByText('Already in your book').count()) === 8 &&
+      !(await page.getByRole('button', { name: /^Import/ }).isEnabled()),
+    're-importing the export adds nothing by default',
+  );
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await input.setInputFiles({
+    name: 'lemon-cake.html',
+    mimeType: 'text/html',
+    buffer: Buffer.from(lemonCakePage),
+  });
+  await page.getByRole('heading', { name: 'Found 1 recipe' }).waitFor();
+  await shot(page, '17 Recipe import');
+  await page.getByRole('button', { name: 'Import 1 recipe' }).click();
+  await page.getByRole('heading', { name: 'Recipes', exact: true }).waitFor();
+  check((await page.locator('.recipe').count()) === 9, 'a recipe web page imports as a 9th recipe');
+  await page.getByText('Lemon & Ricotta Cake').click();
+  await page.getByRole('heading', { name: 'Lemon & Ricotta Cake' }).waitFor();
+  check(
+    (await page.locator('.ingredients li').count()) === 3,
+    'the imported recipe has its ingredients',
+  );
+}
+
+const lemonCakePage = `<!doctype html><html><head><title>Lemon cake</title>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Recipe",
+"name":"Lemon &amp; Ricotta Cake","image":"https://example.com/cake.jpg","recipeYield":"8 slices",
+"prepTime":"PT20M","cookTime":"PT45M","recipeCategory":"Dessert","keywords":"cake, lemon",
+"recipeIngredient":["200 g ricotta","2 lemons","150 g sugar"],
+"recipeInstructions":[{"@type":"HowToStep","text":"Mix everything."},{"@type":"HowToStep","text":"Bake for 45 minutes."}]}
+</script></head><body></body></html>`;
+
+/** Backups with fresh phones: a first backup, a restore on a new install, and the empty-phone guard. */
+async function backups(browser, github) {
+  const repo = 'alex-jimz/sanso-data';
+  const connect = async (page) => {
+    await page.getByPlaceholder('alex-jimz/sanso-data').fill(repo);
+    await page.getByPlaceholder('github_pat_…').fill('test-token');
+    await page.getByRole('button', { name: 'Connect', exact: true }).click();
+  };
+
+  // Phone A has the sample data and backs it up to an empty repository.
+  const a = await newPhone(browser, github);
+  await a.goto(BASE);
+  await a.getByRole('heading', { name: 'Your recipe book is empty' }).waitFor();
+  await a.evaluate(seed);
+  await a.goto(`${BASE}#/more/backup`);
+  await a.reload();
+  await connect(a);
+  check(await seeToast(a, 'Backup is set up'), 'connecting an empty repository backs up');
+  check(github.file('recipes.json')?.length === 7, 'the repository has the 7 recipes');
+  const commits = github.commits();
+
+  // Phone B is a new install: connecting offers to restore instead of backing up.
+  const b = await newPhone(browser, github);
+  await b.goto(`${BASE}#/more/backup`);
+  await connect(b);
+  await b.getByRole('heading', { name: 'Restore your backup?' }).waitFor();
+  check(
+    (await b.getByRole('dialog').innerText()).includes('7 recipes'),
+    'a new install is offered the backup, with what it holds',
+  );
+  await shot(b, '18 Restore on a new install');
+  await b.getByRole('button', { name: 'Restore', exact: true }).click();
+  check(await seeToast(b, 'Restored 7 recipes'), 'restoring brings back the 7 recipes');
+  check(
+    github.commits() === commits && github.file('recipes.json')?.length === 7,
+    'connecting and restoring leave the backup untouched',
+  );
+
+  // Connecting again with data on the phone asks which copy to keep.
+  await b.getByRole('button', { name: 'Turn off' }).click();
+  await b.getByRole('button', { name: 'Turn off', exact: true }).last().click();
+  await connect(b);
+  await b.getByRole('heading', { name: 'This repository already has a backup' }).waitFor();
+  await shot(b, '19 Backup choice');
+  await b.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+  check(
+    await b.getByRole('button', { name: 'Connect', exact: true }).isVisible(),
+    'cancelling the choice saves nothing',
+  );
+
+  // Phone C has backups set up but no data, as after clearing Chrome's storage.
+  const c = await newPhone(browser, github);
+  await c.goto(BASE);
+  await c.getByRole('heading', { name: 'Your recipe book is empty' }).waitFor();
+  await c.evaluate(
+    async ({ repo, token }) => {
+      const db = await new Promise((resolve, reject) => {
+        const req = indexedDB.open('sanso', 1);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('kv', 'readwrite');
+        tx.objectStore('kv').put(
+          { defaultPortions: 1, tags: ['Meal'], backup: { repo, token } },
+          'settings',
+        );
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    },
+    { repo, token: 'test-token' },
+  );
+  await c.goto(`${BASE}#/more/backup`);
+  await c.reload();
+  await c.getByRole('button', { name: 'Back up now' }).click();
+  check(
+    await seeToast(c, 'This phone has no recipes'),
+    'an empty phone refuses to replace a backup that has recipes',
+  );
+  check(
+    github.commits() === commits && github.file('recipes.json')?.length === 7,
+    'and the backup keeps its 7 recipes',
+  );
+  for (const page of [a, b, c]) {
+    await collectCsp(page);
+    await page.context().close();
+  }
+}
+
+/** A fresh Pixel-sized browser profile: its own storage, as on another phone. */
+async function newPhone(browser, github, options = {}) {
   const context = await browser.newContext({
     ...devices['Pixel 7'],
     deviceScaleFactor: 1.5,
     locale: 'en-IE',
     timezoneId: 'Europe/Dublin',
+    ...options,
   });
-  const page = await context.newPage();
-  page.setDefaultTimeout(8000);
-  page.on('console', (m) => {
-    if (m.type() === 'error' || m.type() === 'warning')
-      problems.push(`console ${m.type()}: ${m.text()}`);
-  });
-  page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+  await context.route('https://api.github.com/**', github.handle);
+  await installAldi(context);
   await context.addInitScript(() => {
     window.__csp = [];
     document.addEventListener('securitypolicyviolation', (e) =>
       window.__csp.push(`${e.violatedDirective} ${e.blockedURI}`),
     );
   });
+  const page = await context.newPage();
+  page.setDefaultTimeout(8000);
+  page.on('console', (m) => {
+    // GitHub answers 409 for a repository with no commits yet; Sanso expects it.
+    if (m.text().includes('status of 409')) return;
+    if (m.type() === 'error' || m.type() === 'warning')
+      problems.push(`console ${m.type()}: ${m.text()}`);
+  });
+  page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+  return page;
+}
+
+async function main() {
+  const server = await start();
+  const browser = await chromium.launch();
+  const github = fakeGitHub({ token: 'test-token', repo: 'alex-jimz/sanso-data' });
+  const page = await newPhone(browser, github);
+  let current = page;
   try {
     await run(page);
+    await backups(browser, github);
   } catch (error) {
     problems.push(`stopped: ${error.message.split('\n')[0]}`);
-    await shot(page, 'x Failure').catch(() => {});
+    for (const context of browser.contexts()) for (const p of context.pages()) current = p;
+    await shot(current, 'x Failure').catch(() => {});
   }
   await contactSheets(browser);
   fs.writeFileSync(
