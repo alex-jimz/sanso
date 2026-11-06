@@ -19,7 +19,11 @@ describe('helperBookmark', () => {
   });
 
   it('sends the products to this app', () => {
-    expect(code).toContain("const app = 'https://alex-jimz.github.io/sanso/';");
+    expect(code).toContain('https://alex-jimz.github.io/sanso/');
     expect(code).not.toContain('__SANSO_APP__');
+  });
+
+  it('is short enough for Chrome on Android to run', () => {
+    expect(bookmark.length).toBeLessThan(4500);
   });
 });
