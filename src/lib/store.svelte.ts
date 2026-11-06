@@ -15,6 +15,7 @@ import {
 } from './db';
 import { defaultSections, defaultSettings } from './defaults';
 import { capitalize, normalizeName } from './ingredients';
+import { cleanNutrition, cleanWeights } from './nutrition';
 import { forgetPhotoUrls } from './photos';
 import type { ImportedRecipe } from './recipeFormat';
 import { emptyAmounts, formatAmounts } from './quantity';
@@ -65,6 +66,9 @@ export function cleanRecipe(raw: Recipe): Recipe {
 export function cleanProduct(raw: Product): Product {
   return {
     ...raw,
+    nutrition: cleanNutrition(raw.nutrition),
+    negligible: raw.negligible === true ? true : undefined,
+    weights: cleanWeights(raw.weights),
     name: String(raw.name ?? ''),
     shop: raw.shop === 'aldi' || raw.shop === 'lidl' ? raw.shop : 'any',
     listMode: raw.listMode === 'check' || raw.listMode === 'skip' ? raw.listMode : 'auto',

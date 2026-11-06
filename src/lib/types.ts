@@ -34,9 +34,28 @@ export interface Offer {
   until: string;
 }
 
+/** Per 100 g, or per 100 ml for products sold by volume, as on EU labels. */
+export interface Nutrition {
+  kcal?: number;
+  /** Grams. */
+  protein?: number;
+  /** Grams. */
+  fat?: number;
+  /** Grams, without fibre, as on EU labels. */
+  carbs?: number;
+}
+
 export interface Product {
   id: string;
   name: string;
+  nutrition?: Nutrition;
+  /** Salt, spices and the like: counted as zero calories and zero cost. */
+  negligible?: boolean;
+  /**
+   * Grams in one of a recipe unit, by unit id, as in { clove: 5, tbsp: 14 }.
+   * "piece" is used for plain counts, as in "2 onions".
+   */
+  weights?: Record<string, number>;
   sectionId?: string;
   shop: Shop;
   packSize?: number;

@@ -228,6 +228,9 @@ async function run(page) {
   await page.getByText('Irish beef mince').click();
   await page.getByRole('heading', { name: 'Product', exact: true }).waitFor();
   await shot(page, '11 Product');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await portionFacts(page);
 
   // Offline: the installed app and its data must work with no signal in the shop.
   await page.evaluate(() => navigator.serviceWorker.ready);
@@ -261,6 +264,60 @@ async function run(page) {
   await aldi(page);
   await recipeFiles(page);
   await collectCsp(page);
+}
+
+// Calories, macros and cost per portion, and filling in a missing product from the recipe.
+async function portionFacts(page) {
+  await page.goto(`${BASE}#/recipes/tikka`);
+  await page.getByRole('heading', { name: 'Chicken tikka masala' }).waitFor();
+  const card = page.locator('.facts');
+  const before = await card.innerText();
+  // 400 g chicken, 150 g yoghurt, 400 g tomatoes, 100 ml cream and 200 g rice, over 2 portions.
+  const kcal = Math.round((424 + 108 + 84 + 193 + 704) / 2);
+  check(before.includes(String(kcal)), `the recipe shows ${kcal} kcal per portion`);
+  check(/Protein\s*63 g/.test(before), 'and 63 g protein');
+  // €3.99 chicken, €0.35 yoghurt, €0.55 tomatoes, €0.52 cream, €0.38 rice.
+  check(before.includes('€2.89'), 'and €2.89 per portion');
+  check(before.includes('From 5 of 9 ingredients'), 'and how many ingredients it covers');
+  await card.scrollIntoViewIfNeeded();
+  await shot(page, '11b Per portion');
+
+  await page.getByRole('button', { name: /From 5 of 9/ }).click();
+  await page.getByRole('dialog').waitFor();
+  const sheet = await page.getByRole('dialog').innerText();
+  check(
+    sheet.includes('2 tsp garam masala') && sheet.includes('Not linked to a product yet'),
+    'the sheet says what is missing for each ingredient',
+  );
+  await shot(page, '11c What is missing');
+
+  await page.getByRole('button', { name: /3 garlic cloves/ }).click();
+  await page.getByRole('heading', { name: 'New product' }).waitFor();
+  check(
+    (await page.getByPlaceholder('Basmati rice').inputValue()) === 'Garlic',
+    'tapping an unlinked ingredient starts a product with its name',
+  );
+  check(
+    (await page.locator('.weight-row').innerText()).includes('1 clove'),
+    'the product form asks for the weight of a clove',
+  );
+  await page.getByLabel('Calories per 100 g').fill('149');
+  await page.getByLabel('Protein per 100 g').fill('6,4');
+  await page.getByLabel('Fat per 100 g').fill('0.5');
+  await page.getByLabel('Carbs per 100 g').fill('31');
+  await page.locator('.weight-row input').fill('5');
+  await page.locator('.nutrients').scrollIntoViewIfNeeded();
+  await shot(page, '11d Product nutrition');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+  await page.getByRole('heading', { name: 'Chicken tikka masala' }).waitFor();
+  const after = await page.locator('.facts').innerText();
+  // Plus 15 g of garlic, 22 kcal, over 2 portions: 768.
+  check(after.includes(String(Math.round(kcal + 22.35 / 2))), 'the garlic adds its calories');
+  check(
+    after.includes('Calories from 6 of 9 ingredients, cost from 5'),
+    'garlic without a price counts for calories only',
+  );
 }
 
 async function collectCsp(page) {

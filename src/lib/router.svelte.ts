@@ -21,8 +21,10 @@ class Router {
   private depth = Number(history.state?.depth ?? 0);
 
   constructor() {
-    window.addEventListener('popstate', (event) => {
-      this.depth = Number(event.state?.depth ?? 0);
+    // Reads the current entry rather than the event's: a page opened while a
+    // sheet's entry was being removed may already have been pushed on top.
+    window.addEventListener('popstate', () => {
+      this.depth = Number(history.state?.depth ?? 0);
       this.update();
     });
     window.addEventListener('hashchange', () => this.update());
@@ -45,7 +47,7 @@ class Router {
           `#${path}`,
         );
       } else {
-        this.depth += 1;
+        this.depth = Number(history.state?.depth ?? 0) + 1;
         history.pushState({ depth: this.depth }, '', `#${path}`);
       }
       this.route = parse(`#${path}`);

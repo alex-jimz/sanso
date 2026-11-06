@@ -8,6 +8,16 @@
   import SectionPicker from '../components/SectionPicker.svelte';
   import ProductPhoto from '../components/ProductPhoto.svelte';
   import { addDays, formatDayMonth, todayISO } from '../lib/dates';
+  import { normalizeName } from '../lib/ingredients';
+  import {
+    cleanNutrition,
+    cleanWeights,
+    countedLines,
+    nutrientKeys,
+    nutrientLabels,
+    weightLabel,
+    weightsNeeded,
+  } from '../lib/nutrition';
   import { formatPrice } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
   import { unitPrice } from '../lib/shopping';
@@ -38,7 +48,8 @@
   const base: Product = existing ? $state.snapshot(existing) : newFromShared();
 
   function newFromShared(): Product {
-    if (!shared) return store.newProduct('');
+    // A recipe's "add a product" link passes the ingredient name.
+    if (!shared) return store.newProduct(router.route.query.get('name')?.slice(0, 120) ?? '');
     const { name, ...fields } = shared;
     return store.newProduct(name, fields);
   }
@@ -57,6 +68,32 @@
   let offerPrice = $state(base.offer?.price.toFixed(2) ?? '');
   let offerUntil = $state(
     base.offer && base.offer.until >= today ? base.offer.until : addDays(today, 6),
+  );
+  let nutrition = $state<Record<string, string>>(
+    Object.fromEntries(nutrientKeys.map((k) => [k, base.nutrition?.[k]?.toString() ?? ''])),
+  );
+  let negligible = $state(!!base.negligible);
+  let weights = $state<Record<string, string>>(
+    Object.fromEntries(Object.entries(base.weights ?? {}).map(([k, v]) => [k, String(v)])),
+  );
+
+  const nutrientUnits: Record<string, string> = {
+    kcal: 'kcal',
+    protein: 'g',
+    fat: 'g',
+    carbs: 'g',
+  };
+  const weightHints: Record<string, string> = { tsp: '5', tbsp: '15', clove: '5' };
+
+  // Recipe lines that use this product, so the form can ask for the weights they need.
+  const ownLines = $derived.by(() => {
+    const names = new Set([normalizeName(name), ...aliases]);
+    return store.recipes
+      .flatMap((r) => countedLines(r.ingredients))
+      .filter((line) => names.has(normalizeName(line.name)));
+  });
+  const neededWeights = $derived(
+    weightsNeeded({ weights: base.weights, packSize: parseDecimal(packSize), packUnit }, ownLines),
   );
 
   const shops: { id: Shop; label: string }[] = [
@@ -119,6 +156,13 @@
       listMode,
       aliases,
       offer: onOffer && offer !== undefined ? { price: offer, until: offerUntil } : undefined,
+      nutrition: cleanNutrition(
+        Object.fromEntries(nutrientKeys.map((k) => [k, parseDecimal(nutrition[k])])),
+      ),
+      negligible: negligible || undefined,
+      weights: cleanWeights(
+        Object.fromEntries(Object.entries(weights).map(([k, v]) => [k, parseDecimal(v)])),
+      ),
     };
     await store.saveProduct(product);
     showToast(existing ? 'Product saved' : `${product.name} added`);
@@ -284,6 +328,67 @@
       {/if}
     </div>
 
+    <div class="card card-pad stack">
+      <div>
+        <span class="switch-title">Nutrition</span>
+        <span class="hint"
+          >Per 100 {packUnit === 'ml' ? 'ml' : 'g'}, as on the label. Recipes use it for calories
+          per portion.</span
+        >
+      </div>
+      <label class="switch">
+        <span>
+          <span class="switch-title small">Too little to count</span>
+          <span class="hint">For salt, spices and herbs: zero calories and zero cost.</span>
+        </span>
+        <input type="checkbox" role="switch" bind:checked={negligible} />
+      </label>
+      {#if !negligible}
+        <div class="nutrients">
+          {#each nutrientKeys as key (key)}
+            <label class="field">
+              <span class="field-label">{nutrientLabels[key]}</span>
+              <span class="with-suffix">
+                <input
+                  class="input"
+                  inputmode="decimal"
+                  bind:value={nutrition[key]}
+                  placeholder="0"
+                  aria-label={`${nutrientLabels[key]} per 100 ${packUnit === 'ml' ? 'ml' : 'g'}`}
+                />
+                <span class="suffix">{nutrientUnits[key]}</span>
+              </span>
+            </label>
+          {/each}
+        </div>
+        {#if neededWeights.length}
+          <div class="stack weights">
+            <div>
+              <span class="switch-title small">Weights for recipes</span>
+              <span class="hint">So lines without grams, like “3 garlic cloves”, can count.</span>
+            </div>
+            {#each neededWeights as need (need.key)}
+              <label class="weight-row">
+                <span class="weight-label">
+                  {weightLabel(need.key)}
+                  {#if need.example}<span class="hint">as in “{need.example}”</span>{/if}
+                </span>
+                <span class="with-suffix">
+                  <input
+                    class="input"
+                    inputmode="decimal"
+                    bind:value={weights[need.key]}
+                    placeholder={weightHints[need.key] ?? ''}
+                  />
+                  <span class="suffix">g</span>
+                </span>
+              </label>
+            {/each}
+          </div>
+        {/if}
+      {/if}
+    </div>
+
     <label class="field">
       <span class="field-label">Link</span>
       <span class="link-row">
@@ -446,6 +551,60 @@
 
   input[role='switch']:checked::after {
     translate: 18px 0;
+  }
+
+  .switch-title.small {
+    font-size: 0.9375rem;
+  }
+
+  .nutrients {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .with-suffix {
+    position: relative;
+    display: block;
+  }
+
+  .with-suffix .input {
+    padding-right: 48px;
+  }
+
+  .suffix {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    translate: 0 -50%;
+    color: var(--muted);
+    font-size: 0.875rem;
+    pointer-events: none;
+  }
+
+  .weights {
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .weight-row {
+    display: grid;
+    grid-template-columns: 1fr 112px;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .weight-label {
+    font-weight: 600;
+    min-width: 0;
+  }
+
+  .weight-label .hint {
+    display: block;
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .link-row {
