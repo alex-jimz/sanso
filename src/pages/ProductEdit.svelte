@@ -1,18 +1,34 @@
 <script lang="ts">
   import Check from '@lucide/svelte/icons/check';
+  import ClipboardPaste from '@lucide/svelte/icons/clipboard-paste';
   import ExternalLink from '@lucide/svelte/icons/external-link';
+  import ImagePlus from '@lucide/svelte/icons/image-plus';
+  import Plus from '@lucide/svelte/icons/plus';
   import Tag from '@lucide/svelte/icons/tag';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import X from '@lucide/svelte/icons/x';
   import { untrack } from 'svelte';
+  import ProductPickerSheet from '../components/ProductPickerSheet.svelte';
   import SectionPicker from '../components/SectionPicker.svelte';
   import ProductPhoto from '../components/ProductPhoto.svelte';
+  import { cleanBreakdown, isShopProduct } from '../lib/breakdown';
+  import { readClipboardImage, resizePhoto } from '../lib/photos';
   import { addDays, formatDayMonth, todayISO } from '../lib/dates';
+  import { normalizeName } from '../lib/ingredients';
+  import {
+    cleanNutrition,
+    cleanWeights,
+    countedLines,
+    nutrientKeys,
+    nutrientLabels,
+    weightLabel,
+    weightsNeeded,
+  } from '../lib/nutrition';
   import { formatPrice } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
   import { unitPrice } from '../lib/shopping';
   import { store } from '../lib/store.svelte';
-  import type { ListMode, PackUnit, Product, Shop } from '../lib/types';
+  import type { BreakdownPart, ListMode, PackUnit, Product, Shop } from '../lib/types';
   import { askConfirm, showToast, ui } from '../lib/ui.svelte';
   import { parseDecimal, safeUrl } from '../lib/util';
 
@@ -23,8 +39,11 @@
   const existing = productId === 'new' ? undefined : store.productById.get(productId);
   const shared = productId === 'new' ? ui.shared : null;
   const aldiRaw = shared ? ui.aldiRaw : '';
+  // A picture shared from Chrome, sent here from the photo page.
+  const sharedPhoto = ui.pendingPhoto;
   ui.shared = null;
   ui.aldiRaw = '';
+  ui.pendingPhoto = null;
 
   async function copyAldiRaw() {
     try {
@@ -38,7 +57,8 @@
   const base: Product = existing ? $state.snapshot(existing) : newFromShared();
 
   function newFromShared(): Product {
-    if (!shared) return store.newProduct('');
+    // A recipe's "add a product" link passes the ingredient name.
+    if (!shared) return store.newProduct(router.route.query.get('name')?.slice(0, 120) ?? '');
     const { name, ...fields } = shared;
     return store.newProduct(name, fields);
   }
@@ -57,6 +77,113 @@
   let offerPrice = $state(base.offer?.price.toFixed(2) ?? '');
   let offerUntil = $state(
     base.offer && base.offer.until >= today ? base.offer.until : addDays(today, 6),
+  );
+  let nutrition = $state<Record<string, string>>(
+    Object.fromEntries(nutrientKeys.map((k) => [k, base.nutrition?.[k]?.toString() ?? ''])),
+  );
+  let negligible = $state(!!base.negligible);
+  let weights = $state<Record<string, string>>(
+    Object.fromEntries(Object.entries(base.weights ?? {}).map(([k, v]) => [k, String(v)])),
+  );
+
+  // Photo: a new Blob replaces the stored one, null removes it, undefined keeps it.
+  let photo = $state<Blob | null | undefined>(undefined);
+  let photoBusy = $state(false);
+  let fileInput = $state<HTMLInputElement>();
+  const photoPreview = $derived(photo ? URL.createObjectURL(photo) : undefined);
+  $effect(() => {
+    const url = photoPreview;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  });
+  const hasOwnPhoto = $derived(photo ? true : photo === null ? false : !!base.photoId);
+
+  async function usePhoto(source: Blob | (() => Promise<Blob>)) {
+    photoBusy = true;
+    try {
+      const blob = typeof source === 'function' ? await source() : source;
+      photo = await resizePhoto(blob, 800);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Couldn’t use that picture.');
+    } finally {
+      photoBusy = false;
+    }
+  }
+
+  if (sharedPhoto) void usePhoto(sharedPhoto);
+
+  function pickedFile(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (file) void usePhoto(file);
+  }
+
+  // Parts this product breaks down into, as typed.
+  interface PartRow {
+    productId: string;
+    amount: string;
+    unit: BreakdownPart['unit'];
+    costShare: string;
+  }
+  let parts = $state<PartRow[]>(
+    (base.breakdown ?? []).map((p) => ({
+      productId: p.productId,
+      amount: String(p.amount),
+      unit: p.unit,
+      costShare: p.costShare?.toString() ?? '',
+    })),
+  );
+  let partPickerOpen = $state(false);
+  const shareTotal = $derived(parts.reduce((sum, p) => sum + (parseDecimal(p.costShare) ?? 0), 0));
+  const anyShare = $derived(parts.some((p) => parseDecimal(p.costShare) !== undefined));
+
+  function addPart(product: Product) {
+    parts.push({ productId: product.id, amount: '', unit: 'g', costShare: '' });
+  }
+
+  // Products that break down into this one: the other ways to get it.
+  const sources = $derived(store.sources.get(base.id) ?? []);
+  let sourcePickerOpen = $state(false);
+
+  /** Adds this product to a shop product's breakdown, one pack for one pack. */
+  async function addSource(source: Product) {
+    const unit: BreakdownPart['unit'] = source.packUnit === 'pcs' ? 'pcs' : 'g';
+    const amount = source.packUnit === 'pcs' ? 1 : (source.packSize ?? 1000);
+    const breakdown = [
+      ...(source.breakdown ?? []).filter((p) => p.productId !== base.id),
+      { productId: base.id, amount, unit, costShare: 100 },
+    ];
+    await store.saveProduct({ ...$state.snapshot(source), breakdown });
+    showToast(`${source.name} is now a way to get ${base.name}`);
+  }
+
+  async function removeSource(source: Product) {
+    const breakdown = (source.breakdown ?? []).filter((p) => p.productId !== base.id);
+    await store.saveProduct({
+      ...$state.snapshot(source),
+      breakdown: breakdown.length ? breakdown : undefined,
+    });
+  }
+
+  const nutrientUnits: Record<string, string> = {
+    kcal: 'kcal',
+    protein: 'g',
+    fat: 'g',
+    carbs: 'g',
+  };
+  const weightHints: Record<string, string> = { tsp: '5', tbsp: '15', clove: '5' };
+
+  // Recipe lines that use this product, so the form can ask for the weights they need.
+  const ownLines = $derived.by(() => {
+    const names = new Set([normalizeName(name), ...aliases]);
+    return store.recipes
+      .flatMap((r) => countedLines(r.ingredients))
+      .filter((line) => names.has(normalizeName(line.name)));
+  });
+  const neededWeights = $derived(
+    weightsNeeded({ weights: base.weights, packSize: parseDecimal(packSize), packUnit }, ownLines),
   );
 
   const shops: { id: Shop; label: string }[] = [
@@ -119,8 +246,28 @@
       listMode,
       aliases,
       offer: onOffer && offer !== undefined ? { price: offer, until: offerUntil } : undefined,
+      nutrition: cleanNutrition(
+        Object.fromEntries(nutrientKeys.map((k) => [k, parseDecimal(nutrition[k])])),
+      ),
+      negligible: negligible || undefined,
+      weights: cleanWeights(
+        Object.fromEntries(Object.entries(weights).map(([k, v]) => [k, parseDecimal(v)])),
+      ),
+      breakdown: cleanBreakdown(
+        parts.map((p) => ({
+          productId: p.productId,
+          amount: parseDecimal(p.amount),
+          unit: p.unit,
+          costShare: parseDecimal(p.costShare),
+        })),
+        base.id,
+      ),
     };
-    await store.saveProduct(product);
+    if (parts.some((p) => !(parseDecimal(p.amount)! > 0))) {
+      showToast('Add an amount for each part, or remove the part.');
+      return;
+    }
+    await store.saveProduct(product, photo);
     showToast(existing ? 'Product saved' : `${product.name} added`);
     router.back('/more/products');
   }
@@ -155,10 +302,6 @@
   </div>
 
   <form class="stack" onsubmit={(e) => (e.preventDefault(), save())}>
-    {#if base.imageUrl}
-      <div class="photo"><ProductPhoto url={base.imageUrl} size={120} /></div>
-    {/if}
-
     {#if shared}
       <p class="shared">
         {#if shared.priceCheckedAt}
@@ -179,6 +322,54 @@
         {/if}
       </p>
     {/if}
+
+    <div class="photo-card card card-pad">
+      {#if photoPreview || hasOwnPhoto || base.imageUrl}
+        <div class="photo">
+          <ProductPhoto
+            src={photoPreview}
+            photoId={photo === undefined ? base.photoId : undefined}
+            url={base.imageUrl}
+            size={120}
+          />
+        </div>
+      {/if}
+      <div class="photo-actions">
+        <button
+          class="btn btn-small btn-outline"
+          type="button"
+          disabled={photoBusy}
+          onclick={() => usePhoto(readClipboardImage)}
+        >
+          <ClipboardPaste size={16} /> Paste photo
+        </button>
+        <button
+          class="btn btn-small btn-outline"
+          type="button"
+          disabled={photoBusy}
+          onclick={() => fileInput?.click()}
+        >
+          <ImagePlus size={16} /> Choose a file
+        </button>
+        {#if hasOwnPhoto}
+          <button class="btn btn-small btn-quiet" type="button" onclick={() => (photo = null)}
+            >Remove photo</button
+          >
+        {/if}
+      </div>
+      <p class="hint">
+        To use a picture from the web: in Chrome, long-press it and tap Share image, then pick
+        Sanso. Or tap Copy image and come back here to paste it.
+      </p>
+      <input
+        bind:this={fileInput}
+        class="sr-only"
+        type="file"
+        accept="image/*"
+        tabindex="-1"
+        onchange={pickedFile}
+      />
+    </div>
 
     <label class="field">
       <span class="field-label">Name</span>
@@ -284,6 +475,211 @@
       {/if}
     </div>
 
+    <div class="card card-pad stack">
+      <div>
+        <span class="switch-title">Nutrition</span>
+        <span class="hint"
+          >Per 100 {packUnit === 'ml' ? 'ml' : 'g'}, as on the label. Recipes use it for calories
+          per portion.</span
+        >
+      </div>
+      <label class="switch">
+        <span>
+          <span class="switch-title small">Too little to count</span>
+          <span class="hint">For salt, spices and herbs: zero calories and zero cost.</span>
+        </span>
+        <input type="checkbox" role="switch" bind:checked={negligible} />
+      </label>
+      {#if !negligible}
+        <div class="nutrients">
+          {#each nutrientKeys as key (key)}
+            <label class="field">
+              <span class="field-label">{nutrientLabels[key]}</span>
+              <span class="with-suffix">
+                <input
+                  class="input"
+                  inputmode="decimal"
+                  bind:value={nutrition[key]}
+                  placeholder="0"
+                  aria-label={`${nutrientLabels[key]} per 100 ${packUnit === 'ml' ? 'ml' : 'g'}`}
+                />
+                <span class="suffix">{nutrientUnits[key]}</span>
+              </span>
+            </label>
+          {/each}
+        </div>
+        {#if neededWeights.length}
+          <div class="stack weights">
+            <div>
+              <span class="switch-title small">Weights for recipes</span>
+              <span class="hint">So lines without grams, like “3 garlic cloves”, can count.</span>
+            </div>
+            {#each neededWeights as need (need.key)}
+              <label class="weight-row">
+                <span class="weight-label">
+                  {weightLabel(need.key)}
+                  {#if need.example}<span class="hint">as in “{need.example}”</span>{/if}
+                </span>
+                <span class="with-suffix">
+                  <input
+                    class="input"
+                    inputmode="decimal"
+                    bind:value={weights[need.key]}
+                    placeholder={weightHints[need.key] ?? ''}
+                  />
+                  <span class="suffix">g</span>
+                </span>
+              </label>
+            {/each}
+          </div>
+        {/if}
+      {/if}
+    </div>
+
+    {#if sources.length || (existing && !isShopProduct(base) && !parts.length)}
+      <div class="card card-pad stack">
+        <div>
+          <span class="switch-title">Ways to get it</span>
+          <span class="hint"
+            >{sources.length
+              ? 'Shopping lists ask which one you want. Tap one to change its amount or cost share.'
+              : 'Add a product you buy for it, like a pack of thighs or a whole chicken. Shopping lists then ask which one you want.'}</span
+          >
+        </div>
+        {#if sources.length}
+          <ul class="list ways">
+            {#each sources as { source, part } (source.id)}
+              <li class="way-row">
+                <a
+                  class="row"
+                  href={`#/more/products/${source.id}`}
+                  onclick={(e) => (e.preventDefault(), router.go(`/more/products/${source.id}`))}
+                >
+                  <ProductPhoto url={source.imageUrl} photoId={source.photoId} size={36} />
+                  <span class="row-main">
+                    <span class="row-title">{source.name}</span>
+                    <span class="row-sub">
+                      {part.unit === 'pcs'
+                        ? `${part.amount} per pack`
+                        : `${part.amount} g per pack`}{part.costShare !== undefined
+                        ? ` · ${part.costShare}% of the cost`
+                        : ' · no cost share'}
+                    </span>
+                  </span>
+                </a>
+                <button
+                  class="icon-btn"
+                  type="button"
+                  aria-label={`Stop getting it from ${source.name}`}
+                  onclick={() => removeSource(source)}
+                >
+                  <X size={18} />
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        {#if existing}
+          <button
+            class="btn btn-small btn-outline"
+            type="button"
+            onclick={() => (sourcePickerOpen = true)}
+          >
+            <Plus size={16} /> Add a product you buy for it
+          </button>
+        {/if}
+      </div>
+    {/if}
+
+    {#if !parts.length && !sources.length}
+      <button
+        class="btn btn-quiet start-parts"
+        type="button"
+        onclick={() => (partPickerOpen = true)}
+      >
+        <Plus size={16} /> It breaks down into parts, like a whole chicken
+      </button>
+    {:else if parts.length}
+      <div class="card card-pad stack">
+        <div>
+          <span class="switch-title">Breaks down into</span>
+          <span class="hint"
+            >For things you cut up at home, like a whole chicken. Amounts are for one pack.</span
+          >
+        </div>
+        {#each parts as row, i (row.productId)}
+          {@const partProduct = store.productById.get(row.productId)}
+          <div class="part">
+            <div class="part-head">
+              <span class="part-name">{partProduct?.name ?? 'Deleted product'}</span>
+              <button
+                class="icon-btn"
+                type="button"
+                aria-label={`Remove ${partProduct?.name ?? 'part'}`}
+                onclick={() => parts.splice(i, 1)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div class="part-fields">
+              <label class="field">
+                <span class="field-label">Amount</span>
+                <input
+                  class="input"
+                  inputmode="decimal"
+                  bind:value={row.amount}
+                  placeholder={row.unit === 'g' ? '450' : '2'}
+                />
+              </label>
+              <div class="field">
+                <span class="field-label">Unit</span>
+                <div class="segmented units">
+                  <button
+                    type="button"
+                    aria-pressed={row.unit === 'g'}
+                    onclick={() => (row.unit = 'g')}>g</button
+                  >
+                  <button
+                    type="button"
+                    aria-pressed={row.unit === 'pcs'}
+                    onclick={() => (row.unit = 'pcs')}>pieces</button
+                  >
+                </div>
+              </div>
+              <label class="field">
+                <span class="field-label">Cost share</span>
+                <span class="with-suffix">
+                  <input
+                    class="input"
+                    inputmode="decimal"
+                    bind:value={row.costShare}
+                    placeholder="0"
+                    aria-label={`Cost share of ${partProduct?.name ?? 'part'}, in percent`}
+                  />
+                  <span class="suffix">%</span>
+                </span>
+              </label>
+            </div>
+          </div>
+        {/each}
+        {#if parts.length && anyShare}
+          <p class="hint" class:warn={Math.abs(shareTotal - 100) > 0.5}>
+            Cost shares add up to {Math.round(shareTotal * 10) / 10}%{Math.abs(shareTotal - 100) >
+            0.5
+              ? '. Usually they add up to 100%.'
+              : '.'} Parts without a share cost nothing in recipes.
+          </p>
+        {/if}
+        <button
+          class="btn btn-small btn-outline"
+          type="button"
+          onclick={() => (partPickerOpen = true)}
+        >
+          <Plus size={16} /> Add a part
+        </button>
+      </div>
+    {/if}
+
     <label class="field">
       <span class="field-label">Link</span>
       <span class="link-row">
@@ -336,9 +732,37 @@
   </form>
 </div>
 
+<ProductPickerSheet
+  bind:open={partPickerOpen}
+  title="Add a part"
+  hint="Pick the product you get from it, or type a new one, like Chicken thighs."
+  exclude={[base.id, ...parts.map((p) => p.productId)]}
+  allowNew
+  onpick={addPart}
+/>
+
+<ProductPickerSheet
+  bind:open={sourcePickerOpen}
+  title={`Buy ${base.name} as`}
+  hint="Pick the product you buy. For a whole chicken, add its other parts on its own page."
+  exclude={[base.id, ...sources.map((s) => s.source.id)]}
+  onpick={addSource}
+/>
+
 <style>
   form {
     padding-top: 6px;
+  }
+
+  .photo-card {
+    display: grid;
+    gap: 12px;
+  }
+
+  .photo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .photo {
@@ -446,6 +870,106 @@
 
   input[role='switch']:checked::after {
     translate: 18px 0;
+  }
+
+  .switch-title.small {
+    font-size: 0.9375rem;
+  }
+
+  .nutrients {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .with-suffix {
+    position: relative;
+    display: block;
+  }
+
+  .with-suffix .input {
+    padding-right: 48px;
+  }
+
+  .suffix {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    translate: 0 -50%;
+    color: var(--muted);
+    font-size: 0.875rem;
+    pointer-events: none;
+  }
+
+  .weights {
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .weight-row {
+    display: grid;
+    grid-template-columns: 1fr 112px;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .weight-label {
+    font-weight: 600;
+    min-width: 0;
+  }
+
+  .weight-label .hint {
+    display: block;
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ways {
+    margin: 0 -6px;
+  }
+
+  .way-row {
+    display: flex;
+    align-items: center;
+  }
+
+  .way-row .row {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .part {
+    display: grid;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .part-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .part-name {
+    font-weight: 650;
+  }
+
+  .part-fields {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1fr;
+    gap: 8px;
+  }
+
+  .start-parts {
+    justify-self: start;
+  }
+
+  .hint.warn {
+    color: var(--tomato);
   }
 
   .link-row {

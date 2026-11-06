@@ -102,7 +102,7 @@ export function buildItems(
  * ticks, "have it" / "buy" choices, sections and manual items carry over.
  */
 export function mergeDecisions(fresh: ShoppingItem[], old: ShoppingItem[]): ShoppingItem[] {
-  const generated = old.filter((item) => !item.manual);
+  const generated = old.filter((item) => !item.manual && !item.forParts);
   const byKey = new Map(generated.map((item) => [item.key, item]));
   const byName = new Map(generated.map((item) => [normalizeName(item.name), item]));
   const merged = fresh.map((item) => {
@@ -113,12 +113,15 @@ export function mergeDecisions(fresh: ShoppingItem[], old: ShoppingItem[]): Shop
       id: prev.id,
       part: prev.decided ? prev.part : item.part,
       decided: prev.decided,
+      via: prev.decided ? prev.via : undefined,
       done: prev.done,
       sectionId: prev.sectionId ?? item.sectionId,
       note: prev.note,
     };
   });
-  return [...merged, ...old.filter((item) => item.manual)];
+  // Items bought for parts are kept so their ticks survive; applyBreakdowns
+  // drops the ones no longer needed.
+  return [...merged, ...old.filter((item) => item.manual || item.forParts)];
 }
 
 /** Whole packs needed, allowing 5% short so 410 g still means one 400 g pack. */
@@ -134,6 +137,17 @@ export function packsNeeded(amounts: Amounts, product: Product | undefined): num
   return Math.max(1, Math.ceil(need / product.packSize - 0.05));
 }
 
+/** Packs for the item's own amounts, plus any bought to cover other items' parts. */
+export function itemPacks(item: ShoppingItem, product: Product | undefined): number | undefined {
+  const extra = item.partPacks ?? 0;
+  // A product that breaks down into parts is bought whole, so "1 whole chicken" is one pack.
+  const own =
+    packsNeeded(item.amounts, product) ??
+    (extra && item.amounts.count > 0 ? Math.ceil(item.amounts.count) : undefined);
+  if (!own && !extra) return undefined;
+  return (own ?? 0) + extra;
+}
+
 export function activeOffer(product: Product | undefined, today: string) {
   return product?.offer && product.offer.until >= today ? product.offer : undefined;
 }
@@ -142,7 +156,7 @@ export function activeOffer(product: Product | undefined, today: string) {
 export function itemCost(item: ShoppingItem, product: Product | undefined, today: string) {
   const offer = activeOffer(product, today);
   const unitPrice = offer?.price ?? product?.price;
-  const packs = packsNeeded(item.amounts, product);
+  const packs = itemPacks(item, product);
   return {
     packs,
     offer,

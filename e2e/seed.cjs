@@ -164,10 +164,17 @@ async function seed() {
   const products = [
     product('p-chicken', 'Irish chicken fillets', 'meat', 650, 'g', 6.49, {
       aliases: ['chicken breast'],
+      nutrition: { kcal: 106, protein: 24, fat: 1.1, carbs: 0 },
     }),
-    product('p-rice', 'Basmati rice', 'grains', 1000, 'g', 1.89),
-    product('p-tomatoes', 'Chopped tomatoes', 'tins', 400, 'g', 0.55),
-    product('p-yoghurt', 'Natural yoghurt', 'dairy', 500, 'g', 1.15),
+    product('p-rice', 'Basmati rice', 'grains', 1000, 'g', 1.89, {
+      nutrition: { kcal: 352, protein: 8.2, fat: 1, carbs: 78 },
+    }),
+    product('p-tomatoes', 'Chopped tomatoes', 'tins', 400, 'g', 0.55, {
+      nutrition: { kcal: 21, protein: 1.1, fat: 0.2, carbs: 3.5 },
+    }),
+    product('p-yoghurt', 'Natural yoghurt', 'dairy', 500, 'g', 1.15, {
+      nutrition: { kcal: 72, protein: 4.6, fat: 3.4, carbs: 5.6 },
+    }),
     product('p-spaghetti', 'Spaghetti', 'grains', 500, 'g', 0.85),
     product('p-mince', 'Irish beef mince', 'meat', 500, 'g', 4.29, {
       aliases: ['beef mince'],
@@ -178,7 +185,9 @@ async function seed() {
       aliases: ['salt'],
       listMode: 'skip',
     }),
-    product('p-cream', 'Cream', 'dairy', 250, 'ml', 1.29),
+    product('p-cream', 'Cream', 'dairy', 250, 'ml', 1.29, {
+      nutrition: { kcal: 193, protein: 2.6, fat: 19, carbs: 3.6 },
+    }),
     product('p-potatoes', 'Baby potatoes', 'veg', 1000, 'g', 1.49),
   ];
   const meal = (offset, slot, recipeId, state, portions = 1, note) => ({

@@ -3,6 +3,7 @@
   import CalendarPlus from '@lucide/svelte/icons/calendar-plus';
   import Pencil from '@lucide/svelte/icons/pencil';
   import PlanPickerSheet from '../components/PlanPickerSheet.svelte';
+  import PortionFacts from '../components/PortionFacts.svelte';
   import RecipePhoto from '../components/RecipePhoto.svelte';
   import Stepper from '../components/Stepper.svelte';
   import { displayParts, parseIngredients } from '../lib/ingredients';
@@ -95,6 +96,8 @@
           {/if}
         </dl>
       {/if}
+
+      <PortionFacts {recipe} />
 
       <section>
         <div class="section-head">

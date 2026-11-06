@@ -32,6 +32,8 @@ class Ui {
   shared = $state<SharedProduct | null>(null);
   /** What the aldi.ie helper sent for `shared`, so a problem can be reported. */
   aldiRaw = '';
+  /** An image shared to Sanso, waiting to be added to a product. */
+  pendingPhoto = $state<Blob | null>(null);
 }
 
 export const ui = new Ui();

@@ -13,8 +13,10 @@ import {
   requestPersistence,
   setValue,
 } from './db';
+import { applyBreakdowns, cleanBreakdown, coveringSource, sourceIndex } from './breakdown';
 import { defaultSections, defaultSettings } from './defaults';
 import { capitalize, normalizeName } from './ingredients';
+import { cleanNutrition, cleanWeights } from './nutrition';
 import { forgetPhotoUrls } from './photos';
 import type { ImportedRecipe } from './recipeFormat';
 import { emptyAmounts, formatAmounts } from './quantity';
@@ -33,6 +35,7 @@ import type {
   ShoppingItem,
   ShoppingList,
   Slot,
+  Via,
   Zone,
 } from './types';
 import { showToast } from './ui.svelte';
@@ -65,6 +68,12 @@ export function cleanRecipe(raw: Recipe): Recipe {
 export function cleanProduct(raw: Product): Product {
   return {
     ...raw,
+    nutrition: cleanNutrition(raw.nutrition),
+    negligible: raw.negligible === true ? true : undefined,
+    weights: cleanWeights(raw.weights),
+    breakdown: cleanBreakdown(raw.breakdown, raw.id),
+    lastVia: typeof raw.lastVia === 'string' ? raw.lastVia : undefined,
+    photoId: typeof raw.photoId === 'string' ? raw.photoId : undefined,
     name: String(raw.name ?? ''),
     shop: raw.shop === 'aldi' || raw.shop === 'lidl' ? raw.shop : 'any',
     listMode: raw.listMode === 'check' || raw.listMode === 'skip' ? raw.listMode : 'auto',
@@ -95,6 +104,8 @@ class Store {
   mealById = $derived(new Map(this.meals.map((m) => [m.id, m])));
   orderedSections = $derived([...this.sections].sort((a, b) => a.order - b.order));
   match = $derived(productMatcher(this.products));
+  /** Products that break down into each product, by the part's id. */
+  sources = $derived(sourceIndex(this.products));
 
   /** Runs after every change to the data, e.g. to schedule a backup. */
   onChange: (() => void) | undefined;
@@ -221,8 +232,12 @@ class Store {
 
   // Products
 
-  async saveProduct(input: Product): Promise<Product> {
+  /** `photo`: a new Blob replaces the photo, null removes it, undefined keeps it. */
+  async saveProduct(input: Product, photo?: Blob | null): Promise<Product> {
     const product = cleanProduct(plain(input));
+    const oldPhotoId = this.productById.get(product.id)?.photoId;
+    if (photo) product.photoId = newId();
+    else if (photo === null) product.photoId = undefined;
     const ownName = normalizeName(product.name);
     product.aliases = [...new Set(product.aliases.filter((a) => a && a !== ownName))];
     product.updatedAt = nowISO();
@@ -242,7 +257,11 @@ class Store {
     if (i >= 0) this.products[i] = product;
     else this.products.push(product);
 
-    await this.write(() => Promise.all(changed.map((p) => putRecord('products', p))));
+    await this.write(async () => {
+      if (photo) await putPhoto(product.photoId!, photo);
+      await Promise.all(changed.map((p) => putRecord('products', p)));
+      if (oldPhotoId && oldPhotoId !== product.photoId) await deletePhoto(oldPhotoId);
+    });
     this.refreshList();
     return product;
   }
@@ -276,8 +295,21 @@ class Store {
   }
 
   async deleteProduct(id: string) {
+    const photoId = this.productById.get(id)?.photoId;
     this.products = this.products.filter((p) => p.id !== id);
-    await this.write(() => deleteRecord('products', id));
+    // Products that broke down into it no longer list it as a part.
+    const changed: Product[] = [];
+    for (const other of this.products) {
+      if (!other.breakdown?.some((part) => part.productId === id)) continue;
+      const kept = other.breakdown.filter((part) => part.productId !== id);
+      other.breakdown = kept.length ? kept : undefined;
+      changed.push(plain(other));
+    }
+    await this.write(async () => {
+      await deleteRecord('products', id);
+      if (photoId) await deletePhoto(photoId);
+      await Promise.all(changed.map((p) => putRecord('products', p)));
+    });
     this.refreshList();
   }
 
@@ -359,6 +391,8 @@ class Store {
   }
 
   private async saveList() {
+    if (this.list)
+      this.list.items = applyBreakdowns(plain(this.list.items), this.productById, newId);
     await this.write(() => setValue('list', this.list ? plain(this.list) : null));
   }
 
@@ -390,6 +424,29 @@ class Store {
 
   async setItemPart(id: string, part: ItemPart) {
     await this.updateItem(id, { part, decided: true });
+  }
+
+  /**
+   * Says how to get an item with more than one way: as it is ("self"),
+   * through a product that breaks down into it, or "have" when it's at home.
+   * The way is remembered for the next list.
+   */
+  async chooseWay(id: string, way: Via | 'have') {
+    const item = this.list?.items.find((i) => i.id === id);
+    if (!item) return;
+    if (way === 'have') {
+      await this.updateItem(id, { part: 'have', decided: true });
+      return;
+    }
+    await this.updateItem(id, { part: 'buy', decided: true, via: way });
+    const product = item.productId ? this.productById.get(item.productId) : undefined;
+    if (product && product.lastVia !== way)
+      await this.saveProduct({ ...plain(product), lastVia: way });
+  }
+
+  /** Puts an item back under "Choose how to get". */
+  async reopenChoice(id: string) {
+    await this.updateItem(id, { decided: false, part: 'buy' });
   }
 
   async toggleDone(id: string) {
@@ -461,15 +518,20 @@ class Store {
     for (const meal of ready) meal.state = 'ready';
     const left: ShoppingItem[] = keepUnticked
       ? list.items
-          .filter((i) => !i.done && i.part === 'buy')
+          // Parts bought through another product follow that product.
+          .filter((i) => !i.done && i.part === 'buy' && !coveringSource(i, this.productById))
           .map((i) => ({
             ...plain(i),
             key: `m:${i.id}`,
             manual: true,
             decided: true,
             sources: [],
-            note: i.note ?? (formatAmounts(i.amounts) || undefined),
+            note:
+              i.note ?? (formatAmounts(i.amounts) || (i.partPacks ? `${i.partPacks}` : undefined)),
             amounts: emptyAmounts(),
+            via: undefined,
+            partPacks: undefined,
+            forParts: undefined,
           }))
       : [];
     this.list = left.length

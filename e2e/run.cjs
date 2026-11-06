@@ -228,6 +228,9 @@ async function run(page) {
   await page.getByText('Irish beef mince').click();
   await page.getByRole('heading', { name: 'Product', exact: true }).waitFor();
   await shot(page, '11 Product');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await portionFacts(page);
 
   // Offline: the installed app and its data must work with no signal in the shop.
   await page.evaluate(() => navigator.serviceWorker.ready);
@@ -260,6 +263,295 @@ async function run(page) {
 
   await aldi(page);
   await recipeFiles(page);
+  await collectCsp(page);
+}
+
+// Calories, macros and cost per portion, and filling in a missing product from the recipe.
+async function portionFacts(page) {
+  await page.goto(`${BASE}#/recipes/tikka`);
+  await page.getByRole('heading', { name: 'Chicken tikka masala' }).waitFor();
+  const card = page.locator('.facts');
+  const before = await card.innerText();
+  // 400 g chicken, 150 g yoghurt, 400 g tomatoes, 100 ml cream and 200 g rice, over 2 portions.
+  const kcal = Math.round((424 + 108 + 84 + 193 + 704) / 2);
+  check(before.includes(String(kcal)), `the recipe shows ${kcal} kcal per portion`);
+  check(/Protein\s*63 g/.test(before), 'and 63 g protein');
+  // €3.99 chicken, €0.35 yoghurt, €0.55 tomatoes, €0.52 cream, €0.38 rice.
+  check(before.includes('€2.89'), 'and €2.89 per portion');
+  check(before.includes('From 5 of 9 ingredients'), 'and how many ingredients it covers');
+  await card.scrollIntoViewIfNeeded();
+  await shot(page, '11b Per portion');
+
+  await page.getByRole('button', { name: /From 5 of 9/ }).click();
+  await page.getByRole('dialog').waitFor();
+  const sheet = await page.getByRole('dialog').innerText();
+  check(
+    sheet.includes('2 tsp garam masala') && sheet.includes('Not linked to a product yet'),
+    'the sheet says what is missing for each ingredient',
+  );
+  await shot(page, '11c What is missing');
+
+  await page.getByRole('button', { name: /3 garlic cloves/ }).click();
+  await page.getByRole('heading', { name: 'New product' }).waitFor();
+  check(
+    (await page.getByPlaceholder('Basmati rice').inputValue()) === 'Garlic',
+    'tapping an unlinked ingredient starts a product with its name',
+  );
+  check(
+    (await page.locator('.weight-row').innerText()).includes('1 clove'),
+    'the product form asks for the weight of a clove',
+  );
+  await page.getByLabel('Calories per 100 g').fill('149');
+  await page.getByLabel('Protein per 100 g').fill('6,4');
+  await page.getByLabel('Fat per 100 g').fill('0.5');
+  await page.getByLabel('Carbs per 100 g').fill('31');
+  await page.locator('.weight-row input').fill('5');
+  await page.locator('.nutrients').scrollIntoViewIfNeeded();
+  await shot(page, '11d Product nutrition');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+  await page.getByRole('heading', { name: 'Chicken tikka masala' }).waitFor();
+  const after = await page.locator('.facts').innerText();
+  // Plus 15 g of garlic, 22 kcal, over 2 portions: 768.
+  check(after.includes(String(Math.round(kcal + 22.35 / 2))), 'the garlic adds its calories');
+  check(
+    after.includes('Calories from 6 of 9 ingredients, cost from 5'),
+    'garlic without a price counts for calories only',
+  );
+}
+
+// A whole chicken that breaks down into thighs and drumsticks, on a fresh phone.
+async function breakdown(browser, github) {
+  const page = await newPhone(browser, github);
+  await page.goto(BASE);
+  await page.getByRole('heading', { name: 'Your recipe book is empty' }).waitFor();
+  await page.evaluate(async () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const now = new Date().toISOString();
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('sanso', 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['recipes', 'meals'], 'readwrite');
+      tx.objectStore('recipes').put({
+        id: 'thighs',
+        title: 'Roast thighs and drumsticks',
+        tags: ['Meal'],
+        portions: 2,
+        ingredients: ['600 g chicken thighs', '4 drumsticks', '1 onion'],
+        steps: ['Roast everything for 45 minutes.'],
+        notes: '',
+        createdAt: now,
+        updatedAt: now,
+      });
+      tx.objectStore('meals').put({
+        id: `${day}:dinner`,
+        date: day,
+        slot: 'dinner',
+        recipeId: 'thighs',
+        state: 'toShop',
+        portions: 2,
+      });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  });
+  await page.reload();
+  await page.locator('.recipe').first().waitFor();
+
+  // The whole chicken and its parts.
+  await page.goto(`${BASE}#/more/products/new?name=${encodeURIComponent('Whole chicken XL')}`);
+  await page.getByRole('heading', { name: 'New product' }).waitFor();
+  await page.getByPlaceholder('500', { exact: true }).fill('2200');
+  await page.getByPlaceholder('1.89').fill('7.99');
+  await page.getByRole('button', { name: /It breaks down into parts/ }).click();
+  await page.getByRole('dialog').getByRole('searchbox').fill('Chicken thighs');
+  await page.getByRole('button', { name: 'New product “Chicken thighs”' }).click();
+  await page.getByRole('dialog').waitFor({ state: 'detached' });
+  const thighRow = page.locator('.part').filter({ hasText: 'Chicken thighs' });
+  await thighRow.getByPlaceholder('450').fill('450');
+  await page.getByLabel('Cost share of Chicken thighs, in percent').fill('30');
+  await page.getByRole('button', { name: 'Add a part' }).click();
+  await page.getByRole('dialog').getByRole('searchbox').fill('Drumsticks');
+  await page.getByRole('button', { name: 'New product “Drumsticks”' }).click();
+  await page.getByRole('dialog').waitFor({ state: 'detached' });
+  const drumRow = page.locator('.part').filter({ hasText: 'Drumsticks' });
+  await drumRow.getByRole('button', { name: 'pieces' }).click();
+  await drumRow.getByPlaceholder('2', { exact: true }).fill('2');
+  await page.getByLabel('Cost share of Drumsticks, in percent').fill('15');
+  check(
+    (await page.locator('.page').innerText()).includes('Cost shares add up to 45%'),
+    'the form adds up the cost shares',
+  );
+  await drumRow.scrollIntoViewIfNeeded();
+  await shot(page, '17 Breaks down into');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+
+  await page.getByText('Chicken thighs').click();
+  await page.getByRole('heading', { name: 'Product', exact: true }).waitFor();
+  const ways = await page.locator('.ways').innerText();
+  check(
+    ways.includes('Whole chicken XL') && ways.includes('450 g per pack · 30% of the cost'),
+    'the part lists the whole chicken as a way to get it',
+  );
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  // Parts are priced by their share: 600 g thighs at 30% of €7.99 per 450 g, and
+  // 4 drumsticks at 15% per 2, over 2 portions.
+  await page.goto(`${BASE}#/recipes/thighs`);
+  await page.getByRole('heading', { name: 'Roast thighs and drumsticks' }).waitFor();
+  const facts = await page.locator('.facts').innerText();
+  check(facts.includes('€2.80'), 'the recipe costs €2.80 per portion from the cost shares');
+
+  // The shopping list asks how to get each part.
+  await page.goto(`${BASE}#/shopping`);
+  await page.getByRole('button', { name: 'Make a list' }).click();
+  await page.getByRole('dialog').waitFor();
+  await page.getByRole('button', { name: /Make the list/ }).click();
+  await page.getByRole('heading', { name: 'Choose how to get' }).waitFor();
+  const thighChoice = page.locator('.choose-list li').filter({ hasText: 'Chicken thighs' });
+  const thighWay = thighChoice.getByRole('button', { name: /Whole chicken XL/ });
+  check(
+    (await thighWay.innerText()).includes('2 × 2.2 kg · €15.98'),
+    'each way shows how many to buy and what it costs',
+  );
+  await shot(page, '18 Choose how to get');
+  await thighWay.click();
+  await page
+    .locator('.choose-list li')
+    .filter({ hasText: 'Drumsticks' })
+    .getByRole('button', { name: /Whole chicken XL/ })
+    .click();
+  await page.getByRole('heading', { name: 'Choose how to get' }).waitFor({ state: 'detached' });
+  const chickenRow = page.locator('.item').filter({ hasText: 'Whole chicken XL' });
+  let row = await chickenRow.innerText();
+  check(
+    row.includes('2 × 2.2 kg') &&
+      row.includes('For 600 g Chicken thighs, 4 Drumsticks') &&
+      row.includes('€15.98'),
+    'two whole chickens cover the thighs and drumsticks',
+  );
+  check(row.includes('Also gives 300 g Chicken thighs'), 'and the list says what is left over');
+  await shot(page, '19 Bought for parts');
+
+  // Changing a choice: the thighs are in the freezer after all.
+  await chickenRow.locator('.row').click();
+  await page.getByRole('dialog').waitFor();
+  await page
+    .getByRole('dialog')
+    .locator('.covered')
+    .filter({ hasText: 'Chicken thighs' })
+    .getByRole('button', { name: 'Change' })
+    .click();
+  await page.goBack();
+  await page.getByRole('dialog').waitFor({ state: 'detached' });
+  const again = page.locator('.choose-list li').filter({ hasText: 'Chicken thighs' });
+  check(
+    (await again.locator('.way[aria-pressed="true"]').innerText()).includes('Whole chicken XL') &&
+      (await again.innerText()).includes('what you chose last time'),
+    'a reopened choice suggests the way chosen last time',
+  );
+  await again.getByRole('button', { name: /Have it/ }).click();
+  row = await chickenRow.innerText();
+  check(
+    row.includes('For 4 Drumsticks') && row.includes('Also gives 900 g Chicken thighs'),
+    'with thighs at home, the chickens are only for the drumsticks',
+  );
+
+  // A photo pasted from the clipboard.
+  const photo = await page.evaluate(testPhoto);
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
+  await page.goto(`${BASE}#/more/products`);
+  await page.getByText('Chicken thighs').click();
+  await page.getByRole('heading', { name: 'Product', exact: true }).waitFor();
+  await page.evaluate(async (base64) => {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const blob = new Blob([bytes], { type: 'image/png' });
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+  }, photo);
+  await page.getByRole('button', { name: 'Paste photo' }).click();
+  await page.locator('.photo .product-photo.own').waitFor();
+  check(true, 'a picture copied in Chrome can be pasted onto a product');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+  check(
+    (await page
+      .locator('li')
+      .filter({ hasText: 'Chicken thighs' })
+      .locator('.product-photo.own')
+      .count()) === 1,
+    'the pasted photo is saved with the product',
+  );
+
+  // Pictures and pages shared from Chrome arrive as a POST the service worker handles.
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await page.evaluate(
+    ({ base64, action }) => {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const file = new File([bytes], 'drumsticks.png', { type: 'image/png' });
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.enctype = 'multipart/form-data';
+      form.action = action;
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.name = 'image';
+      const files = new DataTransfer();
+      files.items.add(file);
+      input.files = files.files;
+      form.append(input);
+      document.body.append(form);
+      form.submit();
+    },
+    { base64: photo, action: `${BASE}share` },
+  );
+  await page.getByRole('heading', { name: 'Add a photo' }).waitFor();
+  await shot(page, '20 Shared picture');
+  await page.getByRole('button', { name: 'Drumsticks' }).click();
+  await page.getByRole('heading', { name: 'Product', exact: true }).waitFor();
+  await page.locator('.photo .product-photo.own').waitFor();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+  check(
+    (await page
+      .locator('li')
+      .filter({ hasText: 'Drumsticks' })
+      .locator('.product-photo.own')
+      .count()) === 1,
+    'a picture shared from Chrome is saved on the product picked for it',
+  );
+
+  await page.evaluate((action) => {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.enctype = 'multipart/form-data';
+    form.action = action;
+    for (const [name, value] of [
+      ['title', 'Specially Selected Irish Beef Burgers 454g | ALDI.IE'],
+      ['url', 'https://www.aldi.ie/product/irish-beef-burgers-000000000000123456'],
+    ]) {
+      const input = document.createElement('input');
+      input.name = name;
+      input.value = value;
+      form.append(input);
+    }
+    document.body.append(form);
+    form.submit();
+  }, `${BASE}share`);
+  await page.getByRole('heading', { name: 'New product' }).waitFor();
+  check(
+    (await page.getByPlaceholder('Basmati rice').inputValue()) ===
+      'Specially Selected Irish Beef Burgers',
+    'a page shared through the new share target still becomes a product',
+  );
   await collectCsp(page);
 }
 
@@ -568,6 +860,7 @@ async function main() {
   try {
     await run(page);
     await backups(browser, github);
+    await breakdown(browser, github);
   } catch (error) {
     problems.push(`stopped: ${error.message.split('\n')[0]}`);
     for (const context of browser.contexts()) for (const p of context.pages()) current = p;

@@ -58,6 +58,9 @@
       product.price !== undefined ? formatPrice(product.price) : '',
       per ? `${formatPrice(per.value)}/${per.per}` : '',
       product.shop === 'any' ? '' : product.shop === 'aldi' ? 'Aldi' : 'Lidl',
+      product.breakdown?.length
+        ? `${product.breakdown.length} ${product.breakdown.length === 1 ? 'part' : 'parts'}`
+        : '',
     ]
       .filter(Boolean)
       .join(' · ');
@@ -137,7 +140,7 @@
                 href={`#/more/products/${product.id}`}
                 onclick={(e) => open(e, `/more/products/${product.id}`)}
               >
-                <ProductPhoto url={product.imageUrl} />
+                <ProductPhoto url={product.imageUrl} photoId={product.photoId} />
                 <span class="row-main">
                   <span class="row-title">{product.name}</span>
                   {#if details(product)}<span class="row-sub">{details(product)}</span>{/if}

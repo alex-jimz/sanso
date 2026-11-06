@@ -99,6 +99,29 @@ Typed one per line, the way you'd say them. `src/lib/ingredients.ts` reads:
   - No background or scheduled fetching: aldi.ie blocks automated requests, and the app doesn't try to get around that. Lidl isn't covered.
 - Product photos are shown from Aldi's image server (CSP `img-src https://*.aldi.cx`), not stored on the phone, so they may be missing offline. Shown in Products, the product form and shop mode.
 
+### Calories, macros and cost per portion
+
+- Products have optional nutrition per 100 g (per 100 ml for products sold in ml): kcal, protein, fat and carbs, entered by hand from the label. Carbs follow EU labels, without fibre. Lookups (Open Food Facts barcode scan, a bundled USDA table) were investigated and left for later.
+- "Too little to count" (`negligible`) makes a product zero calories and zero cost, for salt and spices.
+- Lines that aren't weighed need grams per unit (`weights`): `piece` for plain counts ("2 onions"), or the unit id (`clove`, `tbsp`, `bulb`...). The product form only asks for the units its recipe lines use. Tins, packs and jars default to the product's pack size. Millilitres and grams are taken as equal.
+- The recipe page shows kcal, protein, fat, carbs and cost per portion, and how many ingredients they cover (`src/lib/nutrition.ts`, `src/components/PortionFacts.svelte`). A line counts for nutrition only with all four values. "What's missing" lists the other lines and opens their product, or a new product named after the ingredient.
+- Cost is the share of the regular pack price that the recipe uses, not whole packs and not offer prices.
+
+### Breakdowns: things cut up at home
+
+- A product can **break down into** parts, such as a whole chicken into thighs, breast, drumsticks and a carcass (`src/lib/breakdown.ts`). Each part is a product of its own, with an amount per pack in grams or pieces and an optional **cost share** in percent, entered by hand. Parts without a share are free.
+- Recipes link to the part ("600 g chicken thighs"). The part's **ways to get it** are the products that break down into it, plus the part itself if it has a pack size or price. A shop pack of thighs is linked as a one-part breakdown at 100%.
+- On the shopping list, a part with ways goes under **Choose how to get** until a way is picked: one of the products, or Have it (in the freezer). The last way used is remembered on the part (`lastVia`) and highlighted next time; it already counts towards the list until confirmed.
+- Choosing a product adds it to To buy with enough packs for the part that needs most (`partPacks`), lists the parts it's for, and says what's left over for the freezer. If a recipe also uses the product whole, the packs are added to that item. Tapping it lets you change a part's choice.
+- Cost per portion prices a part by its cost share of the product it was last got from. Nutrition is the part's own, per 100 g, often generic values.
+- There's no freezer stock. "Have it" is decided per list.
+
+### Product photos
+
+- A product can have a photo stored on the phone (`photoId`), shrunk to 800 px, which is shown instead of the aldi.ie image and goes into backups.
+- Ways to add one without the gallery: **Paste photo** after Chrome's Copy image, or **Share image** to Sanso, which opens a page to pick the product. "Choose a file" is there too.
+- The share target is a POST (`public/share-target.js`, loaded into the service worker). Pictures are kept in the `sanso-share` cache for the app; shared pages are passed on as `?title=…&text=…&url=…` as before.
+
 ### Recipe files
 
 - More > Recipe files exports all recipes as schema.org Recipe JSON-LD, `{"@context": "https://schema.org", "@graph": [...]}`, with photos as data URLs (`src/lib/recipeFormat.ts`). Notes go in `description`, tags in `recipeCategory` and `keywords`, the score in `aggregateRating` out of 10, and each recipe gets `identifier: "sanso:<id>"`.
@@ -118,11 +141,11 @@ Typed one per line, the way you'd say them. `src/lib/ingredients.ts` reads:
 Types are in `src/lib/types.ts`. Changing them needs a migration in `src/lib/db.ts`, because existing phones and backups hold the old shape.
 
 - **Recipe:** id, title, photoId, tags, portions, prepMinutes, totalMinutes, score, ingredients (lines as typed), steps, notes, createdAt, updatedAt
-- **Product:** id, name, sectionId, shop, packSize, packUnit, price, url, sku, imageUrl, priceCheckedAt, listMode, aliases, offer (price, until), createdAt, updatedAt
+- **Product:** id, name, breakdown (productId, amount, unit g or pcs, costShare), lastVia, photoId, sectionId, shop, packSize, packUnit, price, url, sku, imageUrl, priceCheckedAt, listMode, aliases, offer (price, until), nutrition (kcal, protein, fat, carbs per 100 g or ml), negligible, weights (grams per unit id), createdAt, updatedAt
 - **Section:** id, name, zone (ambient, fridge, freezer), order
 - **Meal:** id (`date:slot`), date, slot, recipeId, portions, state, note
 - **Shopping list:** mealIds, items, createdAt, shopping (in shop mode)
-- **Shopping item:** id, key (`p:<product>`, `n:<name>` or `m:<id>` for manual), productId, name, part (buy, check, have), decided, amounts (mass, volume, count, other units, unspecified), sources (meal, recipe, scaled line), manual, note, sectionId, done
+- **Shopping item:** id, key (`p:<product>`, `n:<name>` or `m:<id>` for manual), productId, name, part (buy, check, have), decided, amounts (mass, volume, count, other units, unspecified), sources (meal, recipe, scaled line), manual, note, sectionId, done, via (`self` or a product id), partPacks, forParts
 - **Cooking session:** mealIds, startedAt, ticked
 - **Settings:** defaultPortions, tags, backup (repo, token, lastBackupAt, lastError)
 
@@ -137,8 +160,8 @@ Ingredient lines are stored as text and parsed when needed, so the parser can im
 
 ## Later
 
-- Cost per portion, from product prices.
-- Calories and macros per portion, from optional nutrition values per 100 g on products. Counted ingredients (garlic cloves, eggs) will need a weight per piece.
+- Nutrition lookups: barcode scan (Chrome's BarcodeDetector) against Open Food Facts, pasting label text copied with Google Lens, and a bundled table of basic foods with typical piece weights from USDA FoodData Central (public domain). CoFID is a closer match for Irish food, but its CC BY-NC-SA licence complicates bundling it in a public repo.
+- Calories per day in the planner.
 - Section order per shop, if Aldi and Lidl differ.
 - Several dishes per meal.
 - Dark mode. Colours already come from CSS variables.

@@ -10,6 +10,7 @@
   import Backup from './pages/Backup.svelte';
   import Cook from './pages/Cook.svelte';
   import More from './pages/More.svelte';
+  import PhotoTarget from './pages/PhotoTarget.svelte';
   import Plan from './pages/Plan.svelte';
   import ProductEdit from './pages/ProductEdit.svelte';
   import Products from './pages/Products.svelte';
@@ -22,8 +23,8 @@
 
   const segments = $derived(router.route.segments);
   const [top = 'recipes', second, third] = $derived(segments);
-  // #/aldi is a one-off review page, not a tab.
-  const topLevel = $derived(segments.length <= 1 && top !== 'aldi');
+  // #/aldi and #/photo are one-off pages, not tabs.
+  const topLevel = $derived(segments.length <= 1 && top !== 'aldi' && top !== 'photo');
   const iconUrl = `${import.meta.env.BASE_URL}icon.svg`;
 </script>
 
@@ -67,6 +68,8 @@
       <AldiHelper />
     {:else if top === 'aldi'}
       <AldiImport />
+    {:else if top === 'photo'}
+      <PhotoTarget />
     {:else if top === 'more'}
       <More />
     {:else}
