@@ -44,6 +44,36 @@ export async function resizePhoto(file: Blob, maxSide = 1280): Promise<Blob> {
   return blob;
 }
 
+export interface CropRect {
+  /** Source pixels, after the photo's own rotation is applied. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Cuts a rectangle out of a photo and shrinks it to at most `maxSide` pixels. */
+export async function cropPhoto(file: Blob, rect: CropRect, maxSide = 1280): Promise<Blob> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const x = Math.max(0, Math.min(rect.x, bitmap.width - 1));
+  const y = Math.max(0, Math.min(rect.y, bitmap.height - 1));
+  const width = Math.max(1, Math.min(rect.width, bitmap.width - x));
+  const height = Math.max(1, Math.min(rect.height, bitmap.height - y));
+  const scale = Math.min(1, maxSide / Math.max(width, height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('This browser can’t process photos.');
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(bitmap, x, y, width, height, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob =
+    (await toBlob(canvas, 'image/webp', 0.82)) ?? (await toBlob(canvas, 'image/jpeg', 0.85));
+  if (!blob) throw new Error('Couldn’t crop that photo.');
+  return blob;
+}
+
 /**
  * An image copied to the clipboard, as with Chrome's "Copy image" on a long
  * press. Throws with a message for the user when there is none or Chrome says no.

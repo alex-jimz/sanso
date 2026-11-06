@@ -5,7 +5,9 @@
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import X from '@lucide/svelte/icons/x';
   import { onDestroy, untrack } from 'svelte';
+  import CropSheet from '../components/CropSheet.svelte';
   import RecipePhoto from '../components/RecipePhoto.svelte';
+  import { getPhoto } from '../lib/db';
   import ScorePicker from '../components/ScorePicker.svelte';
   import Stepper from '../components/Stepper.svelte';
   import { normalizeName, parseIngredients } from '../lib/ingredients';
@@ -54,6 +56,8 @@
   let newTag = $state('');
   let addingTag = $state(false);
   let fileInput: HTMLInputElement;
+  let cropOpen = $state(false);
+  let cropFile = $state<Blob | undefined>();
 
   const parsed = $derived(parseIngredients(ingredientsText.split('\n')));
   const hasPhoto = $derived(photo ? true : photo === null ? false : !!base.photoId);
@@ -75,12 +79,26 @@
     if (preview) URL.revokeObjectURL(preview);
   });
 
-  async function choosePhoto(event: Event) {
+  function choosePhoto(event: Event) {
     const file = (event.currentTarget as HTMLInputElement).files?.[0];
+    fileInput.value = '';
     if (!file) return;
+    cropFile = file;
+    cropOpen = true;
+  }
+
+  /** Crops the photo shown now: the one just picked, or the saved one. */
+  async function cropAgain() {
+    const current = photo ?? (base.photoId ? await getPhoto(base.photoId) : undefined);
+    if (!current) return;
+    cropFile = current;
+    cropOpen = true;
+  }
+
+  async function usePhoto(picked: Blob, cropped: boolean) {
     processing = true;
     try {
-      const blob = await resizePhoto(file);
+      const blob = cropped ? picked : await resizePhoto(picked);
       if (preview) URL.revokeObjectURL(preview);
       photo = blob;
       preview = URL.createObjectURL(blob);
@@ -88,7 +106,6 @@
       showToast(error instanceof Error ? error.message : 'Couldn’t read that photo.');
     } finally {
       processing = false;
-      fileInput.value = '';
     }
   }
 
@@ -209,7 +226,7 @@
         {#if preview}
           <img src={preview} alt="" />
         {:else if hasPhoto}
-          <RecipePhoto photoId={base.photoId} {title} />
+          <span class="fill"><RecipePhoto photoId={base.photoId} {title} /></span>
         {:else}
           <span class="photo-empty">
             <Camera size={30} strokeWidth={1.7} />
@@ -219,6 +236,7 @@
       </button>
       {#if hasPhoto}
         <div class="photo-actions">
+          <button class="btn btn-outline btn-small" type="button" onclick={cropAgain}>Crop</button>
           <button class="btn btn-outline btn-small" type="button" onclick={() => fileInput.click()}
             >Change</button
           >
@@ -228,6 +246,7 @@
         </div>
       {/if}
       <input bind:this={fileInput} type="file" accept="image/*" hidden onchange={choosePhoto} />
+      <CropSheet bind:open={cropOpen} file={cropFile} onconfirm={usePhoto} />
     </div>
 
     <label class="field">
@@ -383,7 +402,9 @@
     position: relative;
     display: grid;
     place-items: center;
-    height: 210px;
+    /* The shape photos are cropped to. */
+    aspect-ratio: 4 / 3;
+    width: 100%;
     padding: 0;
     overflow: hidden;
     border: 1.5px dashed var(--surface-3);
@@ -392,10 +413,19 @@
     color: var(--muted);
   }
 
+  /* Absolutely placed: a percentage height inside a button doesn't resolve,
+     so a tall photo used to show only its top. */
   .photo img {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+
+  .fill {
+    position: absolute;
+    inset: 0;
   }
 
   .photo-empty {

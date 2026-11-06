@@ -13,10 +13,16 @@ import {
   requestPersistence,
   setValue,
 } from './db';
-import { applyBreakdowns, cleanBreakdown, coveringSource, sourceIndex } from './breakdown';
+import {
+  applyBreakdowns,
+  cleanBreakdown,
+  coveringSource,
+  sourceIndex,
+  withPartCost,
+} from './breakdown';
 import { defaultSections, defaultSettings } from './defaults';
 import { capitalize, normalizeName } from './ingredients';
-import { cleanNutrition, cleanWeights } from './nutrition';
+import { cleanNutrition, cleanWeights, recipeFacts } from './nutrition';
 import { forgetPhotoUrls } from './photos';
 import type { ImportedRecipe } from './recipeFormat';
 import { emptyAmounts, formatAmounts } from './quantity';
@@ -106,6 +112,14 @@ class Store {
   match = $derived(productMatcher(this.products));
   /** Products that break down into each product, by the part's id. */
   sources = $derived(sourceIndex(this.products));
+
+  /** Calories, macros and cost per portion. Parts like chicken thighs are priced by their cost share. */
+  factsFor(recipe: Pick<Recipe, 'ingredients' | 'portions'>) {
+    return recipeFacts(recipe, (name) => {
+      const product = this.match(name);
+      return product && withPartCost(product, this.sources);
+    });
+  }
 
   /** Runs after every change to the data, e.g. to schedule a backup. */
   onChange: (() => void) | undefined;

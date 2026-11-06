@@ -71,11 +71,64 @@ async function run(page) {
   // New recipe with a photo.
   await page.getByRole('button', { name: 'Recipe', exact: true }).click();
   await page.getByPlaceholder('Chicken curry').fill('Chickpea curry');
+  // A tall phone photo, kept whole: it must fill the preview, not show only its top.
+  const tall = Buffer.from(
+    await page.evaluate(async () => {
+      const canvas = new OffscreenCanvas(900, 1600);
+      const g = canvas.getContext('2d');
+      const grad = g.createLinearGradient(0, 0, 0, 1600);
+      grad.addColorStop(0, '#d9822b');
+      grad.addColorStop(1, '#2f5d50');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 900, 1600);
+      const bytes = new Uint8Array(await (await canvas.convertToBlob()).arrayBuffer());
+      let binary = '';
+      for (const b of bytes) binary += String.fromCharCode(b);
+      return btoa(binary);
+    }),
+    'base64',
+  );
+  await page
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'tall.png', mimeType: 'image/png', buffer: tall });
+  await page.getByRole('heading', { name: 'Crop photo' }).waitFor();
+  await page.getByRole('button', { name: 'Use whole photo' }).click();
+  await page.locator('.photo img').waitFor();
+  const frameBox = await page.locator('button.photo').boundingBox();
+  const imgBox = await page.locator('.photo img').boundingBox();
+  check(
+    Math.abs(frameBox.height - imgBox.height) < 4 && Math.abs(frameBox.y - imgBox.y) < 3,
+    `a tall photo fills the editor preview (frame ${Math.round(frameBox.y)}+${Math.round(frameBox.height)}, photo ${Math.round(imgBox.y)}+${Math.round(imgBox.height)})`,
+  );
+
+  // A new photo, cropped.
   const png = Buffer.from(await page.evaluate(testPhoto), 'base64');
   await page
     .locator('input[type=file]')
     .setInputFiles({ name: 'curry.png', mimeType: 'image/png', buffer: png });
-  await page.locator('.photo img').waitFor();
+  await page.getByRole('heading', { name: 'Crop photo' }).waitFor();
+  const frame = page.locator('.frame');
+  await frame.locator('img').waitFor();
+  await page.getByLabel('Zoom', { exact: true }).fill('1.6');
+  const box = await frame.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 30, { steps: 5 });
+  await page.mouse.up();
+  await shot(page, '2a Crop photo');
+  await page.getByRole('dialog').getByRole('button', { name: 'Crop', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'detached' });
+  await page.waitForFunction(() => {
+    const img = document.querySelector('.photo img');
+    return img && img.complete && img.naturalWidth > 0;
+  });
+  const cropped = await page
+    .locator('.photo img')
+    .evaluate((img) => ({ w: img.naturalWidth, h: img.naturalHeight }));
+  check(
+    Math.abs(cropped.w / cropped.h - 4 / 3) < 0.01 && cropped.w <= 1280,
+    `the cropped photo is 4:3 (${cropped.w}×${cropped.h})`,
+  );
   await page.getByRole('button', { name: 'Meal', exact: true }).click();
   await page.getByPlaceholder('20', { exact: true }).fill('15');
   await page.getByPlaceholder('45', { exact: true }).fill('35');
@@ -116,10 +169,16 @@ async function run(page) {
   );
   await shot(page, '3 Recipe');
 
+  // A PDF of the recipe, at the 4 portions shown.
+  const curryPdf = await savePdf(page, 'curry');
+  check(curryPdf.name === 'Chickpea curry.pdf', 'the PDF is named after the recipe');
+  check(curryPdf.hasImage, 'the PDF holds the photo');
+
   await page.getByRole('button', { name: 'Add to plan' }).click();
   await page.getByRole('dialog').waitFor();
   await page.locator('.days li').nth(3).locator('.slot').first().click();
-  check((await toastText(page)).startsWith('Planned for'), 'a recipe can be planned from its page');
+  await page.locator('.toast').filter({ hasText: 'Planned for' }).waitFor();
+  check(true, 'a recipe can be planned from its page');
   await page.getByRole('dialog').waitFor({ state: 'detached' });
 
   await page.getByRole('button', { name: 'Back', exact: true }).click();
@@ -318,6 +377,7 @@ async function portionFacts(page) {
     after.includes('Calories from 6 of 9 ingredients, cost from 5'),
     'garlic without a price counts for calories only',
   );
+  await savePdf(page, 'tikka');
 }
 
 // A whole chicken that breaks down into thighs and drumsticks, on a fresh phone.
@@ -553,6 +613,25 @@ async function breakdown(browser, github) {
     'a page shared through the new share target still becomes a product',
   );
   await collectCsp(page);
+}
+
+/** Makes a recipe's PDF from its page and saves it to /out. */
+async function savePdf(page, name) {
+  await page.getByRole('button', { name: 'Make a PDF' }).click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByText(/ KB$/).waitFor();
+  if (name === 'curry') await shot(page, '3a Recipe PDF');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    sheet.getByRole('button', { name: 'Save' }).click(),
+  ]);
+  const path = `${OUT}/${name}.pdf`;
+  await download.saveAs(path);
+  await page.goBack();
+  await sheet.waitFor({ state: 'detached' });
+  const bytes = fs.readFileSync(path);
+  check(bytes.subarray(0, 5).toString() === '%PDF-', `the ${name} PDF is a PDF file`);
+  return { name: download.suggestedFilename(), hasImage: bytes.includes('/DCTDecode') };
 }
 
 async function collectCsp(page) {

@@ -1,9 +1,11 @@
 <script lang="ts">
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import CalendarPlus from '@lucide/svelte/icons/calendar-plus';
+  import FileDown from '@lucide/svelte/icons/file-down';
   import Pencil from '@lucide/svelte/icons/pencil';
   import PlanPickerSheet from '../components/PlanPickerSheet.svelte';
   import PortionFacts from '../components/PortionFacts.svelte';
+  import RecipePdfSheet from '../components/RecipePdfSheet.svelte';
   import RecipePhoto from '../components/RecipePhoto.svelte';
   import Stepper from '../components/Stepper.svelte';
   import { displayParts, parseIngredients } from '../lib/ingredients';
@@ -17,6 +19,7 @@
   const lines = $derived(recipe ? parseIngredients(recipe.ingredients) : []);
   let portions = $state(1);
   let planning = $state(false);
+  let exporting = $state(false);
 
   $effect(() => {
     if (recipe) portions = recipe.portions;
@@ -55,14 +58,24 @@
         >
           <ArrowLeft size={22} />
         </button>
-        <button
-          class="icon-btn glass"
-          type="button"
-          aria-label="Edit recipe"
-          onclick={() => router.go(`/recipes/${recipe.id}/edit`)}
-        >
-          <Pencil size={20} />
-        </button>
+        <span class="hero-actions">
+          <button
+            class="icon-btn glass"
+            type="button"
+            aria-label="Make a PDF"
+            onclick={() => (exporting = true)}
+          >
+            <FileDown size={20} />
+          </button>
+          <button
+            class="icon-btn glass"
+            type="button"
+            aria-label="Edit recipe"
+            onclick={() => router.go(`/recipes/${recipe.id}/edit`)}
+          >
+            <Pencil size={20} />
+          </button>
+        </span>
       </div>
     </div>
 
@@ -159,6 +172,7 @@
   </div>
 
   <PlanPickerSheet bind:open={planning} {recipe} />
+  <RecipePdfSheet bind:open={exporting} {recipe} {portions} />
 {/if}
 
 <style>
@@ -174,6 +188,11 @@
     inset: calc(10px + var(--safe-top)) 12px auto;
     display: flex;
     justify-content: space-between;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 8px;
   }
 
   .content {
