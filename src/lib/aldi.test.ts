@@ -100,6 +100,63 @@ describe('parseAldiPayload', () => {
     expect(item).toMatchObject({ price: 2.39, wasPrice: 2.79, packSize: 12, packUnit: 'pcs' });
   });
 
+  it('reads litres however Aldi spells them', () => {
+    const milk = (sellingSize: string) =>
+      parseAldiPayload(
+        payload([{ sku: '5', name: 'Fresh Milk', sellingSize, price: { amount: 115 } }]),
+      ).items[0];
+    for (const size of ['1 l', '1L', '1 Ltr', '1 LTR', '1 litre', '1000 ml', '100 cl']) {
+      expect(milk(size), size).toMatchObject({ packSize: 1000, packUnit: 'ml' });
+    }
+    expect(milk('2.272 l')).toMatchObject({ packSize: 2272, packUnit: 'ml' });
+  });
+
+  it('works out litres from the price per litre', () => {
+    for (const comparisonDisplay of [
+      '€1.15/1 L',
+      '€1.15/1 LTR',
+      '€1.15 per litre',
+      '€0.12/100 ML',
+    ]) {
+      const [item] = parseAldiPayload(
+        payload([{ sku: '5', name: 'Milk', price: { amount: 115, comparisonDisplay } }]),
+      ).items;
+      expect(item!.packUnit, comparisonDisplay).toBe('ml');
+    }
+    const [item] = parseAldiPayload(
+      payload([{ sku: '5', name: 'Milk', price: { amount: 115, comparisonDisplay: '€1.15/1 L' } }]),
+    ).items;
+    expect(item!.packSize).toBe(1000);
+  });
+
+  it('reads the pack size and price from the page when the API leaves them out', () => {
+    const [milk, eggs] = parseAldiPayload(
+      payload([
+        {
+          sku: '5',
+          name: 'Fresh Milk',
+          via: 'page',
+          pageText: 'COWBELL Fresh Milk 1 l €1.15 (€1.15/1 L)',
+        },
+        {
+          sku: '6',
+          name: 'Eggs',
+          price: { amount: 299 },
+          pageText: 'FARMDALE Eggs 12 Each €2.99 (€0.25/1 Each)',
+        },
+      ]),
+    ).items;
+    expect(milk).toMatchObject({ price: 1.15, packSize: 1000, packUnit: 'ml' });
+    expect(eggs).toMatchObject({ price: 2.99, packSize: 12, packUnit: 'pcs' });
+  });
+
+  it('ignores the "1 L" of a price per litre when the page shows no pack size', () => {
+    const [item] = parseAldiPayload(
+      payload([{ sku: '5', name: 'Milk', pageText: 'Milk €2.30 (€1.15/1 L)' }]),
+    ).items;
+    expect(item).toMatchObject({ price: 2.3, packSize: 2000, packUnit: 'ml' });
+  });
+
   it('skips broken items and duplicates', () => {
     const { items } = parseAldiPayload(
       payload([{ sku: 'x', name: 'No' }, { sku: '2' }, penne, penne, 'nonsense']),

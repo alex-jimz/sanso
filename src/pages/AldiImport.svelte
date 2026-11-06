@@ -56,6 +56,7 @@
     if (openForm) {
       const { item } = fresh[0]!;
       ui.shared = { name: item.name, ...newProductFields(item, today), shop: 'aldi' };
+      ui.aldiRaw = raw ?? '';
       router.go('/more/products/new', { replace: true });
     } else if (raw !== null) {
       router.go('/aldi', { replace: true });

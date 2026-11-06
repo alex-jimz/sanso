@@ -22,7 +22,18 @@
   const productId = untrack(() => id);
   const existing = productId === 'new' ? undefined : store.productById.get(productId);
   const shared = productId === 'new' ? ui.shared : null;
+  const aldiRaw = shared ? ui.aldiRaw : '';
   ui.shared = null;
+  ui.aldiRaw = '';
+
+  async function copyAldiRaw() {
+    try {
+      await navigator.clipboard.writeText(aldiRaw);
+      showToast('Copied');
+    } catch {
+      showToast('Couldn’t copy.');
+    }
+  }
 
   const base: Product = existing ? $state.snapshot(existing) : newFromShared();
 
@@ -151,7 +162,14 @@
     {#if shared}
       <p class="shared">
         {#if shared.priceCheckedAt}
-          From aldi.ie. Pick where it is in the shop, and check the name.
+          From aldi.ie. Pick where it is in the shop, and check the name{shared.packSize
+            ? '.'
+            : ' and add the pack size, which aldi.ie didn’t show.'}
+          {#if aldiRaw}
+            <button class="link-btn" type="button" onclick={copyAldiRaw}
+              >Copy what aldi.ie sent</button
+            >
+          {/if}
         {:else}
           Shared from {shared.shop === 'aldi'
             ? 'Aldi'
@@ -338,6 +356,18 @@
     background: var(--accent-soft);
     color: var(--accent-strong);
     line-height: 1.45;
+  }
+
+  .link-btn {
+    display: block;
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 0.875rem;
+    text-decoration: underline;
   }
 
   .units button {

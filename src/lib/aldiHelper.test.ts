@@ -14,6 +14,10 @@ describe('helperBookmark', () => {
     expect(() => new Function(code)).not.toThrow();
   });
 
+  it('leaves out comments, which would hide code once joined onto one line', () => {
+    expect(code).not.toMatch(/(^|[^:'])\/\/\s/);
+  });
+
   it('sends the products to this app', () => {
     expect(code).toContain("const app = 'https://alex-jimz.github.io/sanso/';");
     expect(code).not.toContain('__SANSO_APP__');

@@ -30,6 +30,8 @@ class Ui {
   confirm = $state<ConfirmRequest | null>(null);
   /** A product page shared to Sanso from another app, waiting to be saved. */
   shared = $state<SharedProduct | null>(null);
+  /** What the aldi.ie helper sent for `shared`, so a problem can be reported. */
+  aldiRaw = '';
 }
 
 export const ui = new Ui();

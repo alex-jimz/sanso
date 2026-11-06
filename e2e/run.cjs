@@ -312,6 +312,28 @@ async function aldi(page) {
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   check(await seeToast(page, 'Cucina Penne Pasta added'), 'the new product is saved');
 
+  // When the API doesn't answer, the helper reads the size and price off the page,
+  // and not those of the other products further down it.
+  await page.goto(`https://www.aldi.ie${productLink(aldiProducts['000000000000400333'])}`);
+  await runHelper(page, bookmark);
+  await page.getByRole('heading', { name: 'New product' }).waitFor();
+  check(
+    (await page.getByPlaceholder('500', { exact: true }).inputValue()) === '1000' &&
+      (await page.getByRole('button', { name: 'ml', exact: true }).getAttribute('aria-pressed')) ===
+        'true',
+    'without the API, the helper reads “1 l” off the page as 1000 ml',
+  );
+  check(
+    (await page.getByPlaceholder('1.89').inputValue()) === '1.15',
+    'and the price from the page',
+  );
+  check(
+    await page.getByRole('button', { name: 'Copy what aldi.ie sent' }).isVisible(),
+    'the product form offers to copy what aldi.ie sent',
+  );
+  await shot(page, '14b From aldi.ie, page only');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
   // A week later the penne drops in price, and the offers page has two new products.
   setAldiPrice('000000000000282766', 79, 99);
   await page.goto('https://www.aldi.ie/products/super-savers');
@@ -524,6 +546,12 @@ async function newPhone(browser, github, options = {}) {
   page.on('console', (m) => {
     // GitHub answers 409 for a repository with no commits yet; Sanso expects it.
     if (m.text().includes('status of 409')) return;
+    // The fake API fails on purpose for the milk, so the helper reads the page instead.
+    if (
+      page.url().startsWith('https://www.aldi.ie/') &&
+      /000000000000400333|Failed to fetch|status of 404|ERR_FAILED/.test(m.text())
+    )
+      return;
     if (m.type() === 'error' || m.type() === 'warning')
       problems.push(`console ${m.type()}: ${m.text()}`);
   });
