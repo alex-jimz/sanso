@@ -2,10 +2,11 @@
   import Link from '@lucide/svelte/icons/link';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Search from '@lucide/svelte/icons/search';
+  import { coveredBy } from '../lib/breakdown';
   import { formatDayMonth, relativeDay, todayISO } from '../lib/dates';
   import { normalizeName, parseIngredient } from '../lib/ingredients';
   import { itemAmount } from '../lib/listView';
-  import { formatPrice } from '../lib/quantity';
+  import { formatAmounts, formatPrice } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
   import { itemCost } from '../lib/shopping';
   import { slotLabel } from '../lib/states';
@@ -21,6 +22,12 @@
   const product = $derived(item?.productId ? store.productById.get(item.productId) : undefined);
   const sectionId = $derived(product?.sectionId ?? item?.sectionId);
   const cost = $derived(item ? itemCost(item, product, today) : undefined);
+  // Parts this item is bought for, like the thighs a whole chicken covers.
+  const coveredParts = $derived(
+    item?.productId && store.list
+      ? coveredBy(item.productId, store.list.items, store.productById)
+      : [],
+  );
 
   let linking = $state(false);
   let query = $state('');
@@ -151,6 +158,26 @@
           </div>
         {/if}
 
+        {#if coveredParts.length}
+          <div>
+            <p class="eyebrow">Bought for</p>
+            <ul class="sources">
+              {#each coveredParts as part (part.id)}
+                <li class="covered">
+                  <span class="source-line"
+                    >{[formatAmounts(part.amounts), part.name].filter(Boolean).join(' ')}</span
+                  >
+                  <button
+                    class="btn btn-small"
+                    type="button"
+                    onclick={() => store.reopenChoice(part.id)}>Change</button
+                  >
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+
         {#if item.manual}
           <label class="field">
             <span class="field-label">Amount or note</span>
@@ -252,6 +279,13 @@
     font-size: 0.8125rem;
     font-weight: 650;
     color: var(--muted);
+  }
+
+  .sources li.covered {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
 
   .links {

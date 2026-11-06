@@ -45,9 +45,28 @@ export interface Nutrition {
   carbs?: number;
 }
 
+/** One part a product breaks down into at home, per pack, as in 450 g of thighs per chicken. */
+export interface BreakdownPart {
+  productId: string;
+  amount: number;
+  /** Grams, or pieces for parts counted like "2 drumsticks". */
+  unit: 'g' | 'pcs';
+  /** Share of the pack's price that this part carries, in percent. No share means free. */
+  costShare?: number;
+}
+
+/** How a shopping item is got: the product as it is, or one that breaks down into it. */
+export type Via = 'self' | string;
+
 export interface Product {
   id: string;
   name: string;
+  /** Parts one pack breaks down into, for things cut up at home like a whole chicken. */
+  breakdown?: BreakdownPart[];
+  /** The way this product was last got, so the next list suggests it. */
+  lastVia?: Via;
+  /** A photo stored on the phone. Shown instead of `imageUrl`. */
+  photoId?: string;
   nutrition?: Nutrition;
   /** Salt, spices and the like: counted as zero calories and zero cost. */
   negligible?: boolean;
@@ -144,6 +163,15 @@ export interface ShoppingItem {
   /** Section for items with no product. */
   sectionId?: string;
   done: boolean;
+  /**
+   * For products with more than one way to get them: "self", or the id of the
+   * product that breaks down into this one. Such an item is bought as part of that product.
+   */
+  via?: Via;
+  /** Extra packs of this product, to cover parts other items get from it. */
+  partPacks?: number;
+  /** Added only to cover other items' parts, not needed by a recipe itself. */
+  forParts?: boolean;
 }
 
 export interface ShoppingList {

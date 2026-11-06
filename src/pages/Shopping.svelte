@@ -12,9 +12,17 @@
   import MealSelectSheet from '../components/MealSelectSheet.svelte';
   import ProductPhoto from '../components/ProductPhoto.svelte';
   import Sheet from '../components/Sheet.svelte';
+  import {
+    coveredBy,
+    coveringSource,
+    leftovers,
+    needsChoice,
+    waysOf,
+    wayEstimate,
+  } from '../lib/breakdown';
   import { todayISO } from '../lib/dates';
-  import { itemAmount } from '../lib/listView';
-  import { formatPrice } from '../lib/quantity';
+  import { itemAmount, packLabel } from '../lib/listView';
+  import { formatAmounts, formatPrice } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
   import { activeOffer, itemCost } from '../lib/shopping';
   import { store } from '../lib/store.svelte';
@@ -34,15 +42,54 @@
   const list = $derived(store.list);
   const items = $derived(list?.items ?? []);
   const shopping = $derived(!!list?.shopping);
-  const toCheck = $derived(items.filter((i) => i.part === 'check'));
-  const toBuy = $derived(items.filter((i) => i.part === 'buy'));
+  // Parts bought through another product, like thighs from a whole chicken,
+  // are listed under that product rather than on their own.
+  const covered = (item: ShoppingItem) => !!coveringSource(item, store.productById);
+  const toChoose = $derived(items.filter((i) => needsChoice(i, store.sources)));
+  const listed = $derived(items.filter((i) => !needsChoice(i, store.sources) && !covered(i)));
+  const toCheck = $derived(listed.filter((i) => i.part === 'check'));
+  const toBuy = $derived(listed.filter((i) => i.part === 'buy'));
   const have = $derived(items.filter((i) => i.part === 'have'));
-  const inTrolley = $derived(items.filter((i) => i.part !== 'have'));
+  const inTrolley = $derived(items.filter((i) => i.part !== 'have' && !covered(i)));
   const done = $derived(inTrolley.filter((i) => i.done).length);
   const untickedToBuy = $derived(toBuy.filter((i) => !i.done).length);
 
   const productOf = (item: ShoppingItem) =>
     item.productId ? store.productById.get(item.productId) : undefined;
+
+  /** "For 600 g Chicken thighs, 500 g Chicken breast", for a whole product bought for parts. */
+  function forParts(item: ShoppingItem): string {
+    if (!item.partPacks || !item.productId) return '';
+    const parts = coveredBy(item.productId, items, store.productById).map((i) =>
+      [formatAmounts(i.amounts), i.name].filter(Boolean).join(' '),
+    );
+    return parts.length ? `For ${parts.join(', ')}` : '';
+  }
+
+  function extras(item: ShoppingItem): string {
+    const product = productOf(item);
+    if (!item.partPacks || !product) return '';
+    const left = leftovers(
+      product,
+      item.partPacks,
+      coveredBy(product.id, items, store.productById),
+      store.productById,
+    );
+    return left.length ? `Also gives ${left.join(', ')}` : '';
+  }
+
+  function wayDetails(item: ShoppingItem, way: ReturnType<typeof waysOf>[number]): string {
+    const product = productOf(item);
+    if (!product) return '';
+    const estimate = wayEstimate(item, product, way, today);
+    const label = packLabel(estimate.packProduct);
+    return [
+      estimate.packs ? (label ? `${estimate.packs} × ${label}` : `${estimate.packs}`) : '',
+      estimate.cost !== undefined ? formatPrice(estimate.cost) : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
 
   const costs = $derived.by(() => {
     let total = 0;
@@ -200,7 +247,11 @@
                 onclick={() => store.toggleDone(item.id)}
               >
                 <span class="check" class:on={item.done}><Check size={17} strokeWidth={3} /></span>
-                <ProductPhoto url={productOf(item)?.imageUrl} size={40} />
+                <ProductPhoto
+                  url={productOf(item)?.imageUrl}
+                  photoId={productOf(item)?.photoId}
+                  size={40}
+                />
                 <span class="row-main">
                   <span class="row-title">{item.name}</span>
                   <span class="row-sub">
@@ -208,6 +259,7 @@
                       ? ' · only if needed'
                       : ''}
                   </span>
+                  {#if forParts(item)}<span class="row-sub">{forParts(item)}</span>{/if}
                 </span>
                 {@render offerPill(item)}
               </button>
@@ -261,6 +313,45 @@
       </p>
     {/if}
 
+    {#if toChoose.length}
+      <section class="card choose-card">
+        <h2 class="check-title">Choose how to get</h2>
+        <p class="hint">You can get these more than one way. Sanso remembers your choice.</p>
+        <ul class="choose-list">
+          {#each toChoose as item (item.id)}
+            {@const product = productOf(item)!}
+            <li>
+              <button class="check-main" type="button" onclick={() => openItem(item)}>
+                <span class="row-title">{item.name}</span>
+                <span class="row-sub">{itemAmount(item, product) || 'Some'}</span>
+              </button>
+              <div class="ways" role="group" aria-label={`How to get ${item.name}`}>
+                {#each waysOf(product, store.sources.get(product.id) ?? []) as way (way.via)}
+                  <button
+                    class="way"
+                    type="button"
+                    aria-pressed={item.via === way.via}
+                    onclick={() => store.chooseWay(item.id, way.via)}
+                  >
+                    <span class="way-name">{way.from ? way.from.source.name : product.name}</span>
+                    {#if wayDetails(item, way)}<span class="way-sub">{wayDetails(item, way)}</span
+                      >{/if}
+                  </button>
+                {/each}
+                <button class="way" type="button" onclick={() => store.chooseWay(item.id, 'have')}>
+                  <span class="way-name">Have it</span>
+                  <span class="way-sub">In the freezer or cupboard</span>
+                </button>
+              </div>
+              {#if item.via}
+                <p class="hint suggested">Highlighted: what you chose last time. Tap to confirm.</p>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
     {#if toCheck.length}
       <section class="card check-card">
         <h2 class="check-title">Check what you have</h2>
@@ -310,6 +401,8 @@
                     {#if itemAmount(item, productOf(item))}
                       <span class="row-sub">{itemAmount(item, productOf(item))}</span>
                     {/if}
+                    {#if forParts(item)}<span class="row-sub">{forParts(item)}</span>{/if}
+                    {#if extras(item)}<span class="row-sub extras">{extras(item)}</span>{/if}
                   </span>
                   {@render offerPill(item)}
                   {#if cost.total !== undefined}<span class="price">{formatPrice(cost.total)}</span
@@ -469,6 +562,78 @@
 
   .estimate span {
     font-size: 0.8125rem;
+  }
+
+  .choose-card {
+    margin-bottom: 14px;
+    padding: 16px 16px 8px;
+    background: var(--accent-soft);
+    box-shadow: none;
+  }
+
+  .choose-card .check-title {
+    color: var(--accent-strong);
+  }
+
+  .choose-card .hint {
+    color: var(--accent-strong);
+    opacity: 0.85;
+  }
+
+  .choose-list {
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .choose-list li {
+    display: grid;
+    gap: 8px;
+    padding: 10px 0;
+  }
+
+  .choose-list li + li {
+    border-top: 1px solid var(--line);
+  }
+
+  .ways {
+    display: grid;
+    gap: 6px;
+  }
+
+  .way {
+    display: grid;
+    gap: 1px;
+    min-height: 48px;
+    padding: 8px 12px;
+    border: 1.5px solid transparent;
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    text-align: left;
+  }
+
+  .way[aria-pressed='true'] {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+
+  .way-name {
+    font-weight: 650;
+  }
+
+  .way-sub {
+    color: var(--muted);
+    font-size: 0.8125rem;
+  }
+
+  .suggested {
+    margin: 0;
+    font-size: 0.8125rem;
+  }
+
+  .extras {
+    color: var(--accent);
   }
 
   .check-card {

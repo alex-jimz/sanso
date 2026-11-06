@@ -83,6 +83,7 @@ export default defineConfig({
       workbox: {
         // Everything the app needs offline, fonts included.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        importScripts: ['share-target.js'],
       },
       manifest: {
         name: 'Sanso',
@@ -92,11 +93,19 @@ export default defineConfig({
         display: 'standalone',
         theme_color: '#faf6f0',
         background_color: '#faf6f0',
-        // Lets Chrome's Share menu send product pages to the app.
+        // Lets Chrome's Share menu send product pages and pictures to the app.
+        // Pictures need a POST, which public/share-target.js handles in the
+        // service worker; it passes pages on as ?title=…&text=…&url=….
         share_target: {
-          action: './',
-          method: 'GET',
-          params: { title: 'title', text: 'text', url: 'url' },
+          action: './share',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            title: 'title',
+            text: 'text',
+            url: 'url',
+            files: [{ name: 'image', accept: ['image/*'] }],
+          },
         },
         icons: [
           {

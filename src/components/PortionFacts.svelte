@@ -12,12 +12,19 @@
   import { formatPrice } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
   import { store } from '../lib/store.svelte';
-  import type { Recipe } from '../lib/types';
+  import { withPartCost } from '../lib/breakdown';
+  import type { Product, Recipe } from '../lib/types';
   import Sheet from './Sheet.svelte';
 
   let { recipe }: { recipe: Recipe } = $props();
 
-  const facts = $derived(recipeFacts(recipe, store.match));
+  // Parts of something cut up at home, like chicken thighs, are priced by their cost share.
+  const facts = $derived(
+    recipeFacts(recipe, (name) => {
+      const product = store.match(name);
+      return product && withPartCost(product, store.sources);
+    }),
+  );
   const total = $derived(facts.lines.length);
   const hasNutrition = $derived(facts.nutritionCount > 0);
   const hasCost = $derived(facts.costCount > 0);
@@ -25,14 +32,16 @@
   const gaps = $derived(facts.lines.filter((l) => l.missing.length));
   let open = $state(false);
 
-  function describe(missing: Missing[]): string {
+  function describe(missing: Missing[], product: Product | undefined): string {
+    const isPart = !!product && !!store.sources.get(product.id)?.length;
     const notes: string[] = [];
     const needs: string[] = [];
     for (const m of missing) {
       if (m.kind === 'product') notes.push('Not linked to a product yet');
       else if (m.kind === 'amount') notes.push('No amount in the recipe');
       else if (m.kind === 'nutrition') needs.push('nutrition');
-      else if (m.kind === 'price') needs.push('price and pack size');
+      else if (m.kind === 'price')
+        needs.push(isPart ? 'a cost share where it comes from' : 'price and pack size');
       else needs.push(`weight of ${weightLabel(m.unit)}`);
     }
     if (needs.length) notes.push(`${notes.length ? 'needs' : 'Needs'} ${needs.join(', ')}`);
@@ -106,7 +115,10 @@
               <span class="row-main">
                 <span class="row-title">{gap.line.text}</span>
                 <span class="row-sub"
-                  >{gap.product ? `${gap.product.name}: ` : ''}{describe(gap.missing)}</span
+                  >{gap.product ? `${gap.product.name}: ` : ''}{describe(
+                    gap.missing,
+                    gap.product,
+                  )}</span
                 >
               </span>
               <ChevronRight size={18} />

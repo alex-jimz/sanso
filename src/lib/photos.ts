@@ -43,3 +43,39 @@ export async function resizePhoto(file: Blob, maxSide = 1280): Promise<Blob> {
   if (!blob) throw new Error('Couldn’t read that photo.');
   return blob;
 }
+
+/**
+ * An image copied to the clipboard, as with Chrome's "Copy image" on a long
+ * press. Throws with a message for the user when there is none or Chrome says no.
+ */
+export async function readClipboardImage(): Promise<Blob> {
+  if (!navigator.clipboard?.read) throw new Error('This browser can’t paste images.');
+  let items: ClipboardItems;
+  try {
+    items = await navigator.clipboard.read();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'NotAllowedError')
+      throw new Error('Chrome didn’t allow Sanso to read the clipboard.');
+    throw new Error('Couldn’t read the clipboard.');
+  }
+  for (const item of items) {
+    const type = item.types.find((t) => t.startsWith('image/'));
+    if (type) return item.getType(type);
+  }
+  throw new Error('There’s no image on the clipboard. Long-press a picture and tap Copy image.');
+}
+
+/** Where the service worker keeps an image shared to Sanso (see public/share-target.js). */
+const shareCache = 'sanso-share';
+const sharedImageKey = () => new URL(`${import.meta.env.BASE_URL}shared-image`, location.href).href;
+
+/** Takes the image waiting from Chrome's Share menu, if there is one. */
+export async function takeSharedImage(): Promise<Blob | undefined> {
+  if (!('caches' in self)) return undefined;
+  const cache = await caches.open(shareCache);
+  const response = await cache.match(sharedImageKey());
+  if (!response) return undefined;
+  const blob = await response.blob();
+  await cache.delete(sharedImageKey());
+  return blob.size ? blob : undefined;
+}
