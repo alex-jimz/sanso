@@ -57,6 +57,14 @@ Typed one per line, the way you'd say them. `src/lib/ingredients.ts` reads:
 - notes: "1 onion, finely chopped", "2 eggs (beaten)", "olive oil for frying"
 - an amount after the name: "Pasta 100 g"
 - a line ending in ":" is a group heading, as in "For the sauce:"
+- choices with "or", in `src/lib/choices.ts`: "600 g chicken thighs or 600 g chicken breast". An alternative without an amount takes the first one's, so "1 kg potatoes or sweet potatoes" is 1 kg of either. "or" inside brackets or after a note stays part of the note: "1 onion (or 2 shallots)", "1 onion, chopped or grated".
+
+### Ingredient options
+
+- Each line offers one option per alternative and matching product, so "500 g ground beef" offers both Ground beef 10% fat and 20% fat. The first option is picked until another is.
+- The recipe page keeps its picks on the recipe (`choices`), and they drive its calories and cost and the PDF. Planning a meal copies them; the meal sheet changes them for that meal only (`Meal.choices`). The shopping list and cooking use each meal's picks, and meals of one recipe with different picks are cooked separately.
+- A pick is stored as an option key, `p:<product id>` or `n:<normalised name>`, so editing a recipe keeps picks that still exist and falls back to the first option for the rest.
+- The first product picked for a name that nothing matched exactly becomes its alias, so it's the default in every recipe.
 
 ### Meal planner
 
@@ -94,7 +102,8 @@ Typed one per line, the way you'd say them. `src/lib/ingredients.ts` reads:
 ### Products and prices
 
 - A product has a name, shop section, shop (Aldi, Lidl or either), pack size (g, ml or pieces), price, link, how it's listed (Normal, Ask first, Never), an optional offer (price and end date), and the ingredient names it matches. Price per kg, litre or piece is calculated.
-- Ingredient names are matched to products by a normalised name ("Fresh Tomatoes" and "tomato" match), or by an alias learned when I link an item. An alias belongs to one product only.
+- Ingredient names are matched to products in `src/lib/matching.ts`. Exact matches come first: a normalised name ("Fresh Tomatoes" and "tomato" match), or an alias learned when I link an item. An alias belongs to one product only.
+- Then products whose name contains every word of the ingredient, as "Ground beef 10% fat" for "ground beef". The ingredient's last word must be the product's main noun: only numbers and words like fat, lean, fillets, skinless or pack may follow it, so "garlic" doesn't match Garlic bread. Words in front aren't checked, so "milk" matches Coconut milk; removing the dashed name on the product page records it in `notFor`.
 - **Sharing from Chrome:** Sanso is a share target (`share_target` in `vite.config.ts`). Sharing an aldi.ie or lidl.ie product page opens a new product with the name, shop, link and pack size filled in from the page title and URL (`src/lib/share.ts`). If the link is already known, it opens that product instead, to update the price or offer.
 - **aldi.ie helper:** a bookmarklet (`src/lib/aldiBookmarklet.js`, wrapped by `src/lib/aldiHelper.ts`, installed from Products > Get prices and photos from aldi.ie). Run from Chrome's address bar on an aldi.ie product, search or offers page, it reads the product numbers from the page's `/product/<slug>-<sku>` links, asks `api.aldi.ie/v2/products/<sku>` for each (up to 60, four at a time, from the user's own browser as the page does), and opens Sanso at `#/aldi?d=<JSON>`. The fragment never reaches a server.
   - Sanso treats that data as untrusted (`src/lib/aldi.ts`): fields are validated one by one, photos must be https on `*.aldi.cx` or `*.aldi.ie`, links are rebuilt from a safe slug, and nothing is saved until I confirm on the review page.
@@ -145,10 +154,10 @@ Typed one per line, the way you'd say them. `src/lib/ingredients.ts` reads:
 
 Types are in `src/lib/types.ts`. Changing them needs a migration in `src/lib/db.ts`, because existing phones and backups hold the old shape.
 
-- **Recipe:** id, title, photoId, tags, portions, prepMinutes, totalMinutes, score, ingredients (lines as typed), steps, notes, createdAt, updatedAt
-- **Product:** id, name, breakdown (productId, amount, unit g or pcs, costShare), lastVia, photoId, sectionId, shop, packSize, packUnit, price, url, sku, imageUrl, priceCheckedAt, listMode, aliases, offer (price, until), nutrition (kcal, protein, fat, carbs per 100 g or ml), negligible, weights (grams per unit id), createdAt, updatedAt
+- **Recipe:** id, title, photoId, tags, portions, prepMinutes, totalMinutes, score, ingredients (lines as typed), choices (option keys), steps, notes, createdAt, updatedAt
+- **Product:** id, name, breakdown (productId, amount, unit g or pcs, costShare), lastVia, photoId, sectionId, shop, packSize, packUnit, price, url, sku, imageUrl, priceCheckedAt, listMode, aliases, notFor (names it doesn't mean), offer (price, until), nutrition (kcal, protein, fat, carbs per 100 g or ml), negligible, weights (grams per unit id), createdAt, updatedAt
 - **Section:** id, name, zone (ambient, fridge, freezer), order
-- **Meal:** id (`date:slot`), date, slot, recipeId, portions, state, note
+- **Meal:** id (`date:slot`), date, slot, recipeId, portions, state, note, choices (option keys)
 - **Shopping list:** mealIds, items, createdAt, shopping (in shop mode)
 - **Shopping item:** id, key (`p:<product>`, `n:<name>` or `m:<id>` for manual), productId, name, part (buy, check, have), decided, amounts (mass, volume, count, other units, unspecified), sources (meal, recipe, scaled line), manual, note, sectionId, done, via (`self` or a product id), partPacks, forParts
 - **Cooking session:** mealIds, startedAt, ticked

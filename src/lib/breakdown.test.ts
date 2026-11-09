@@ -12,7 +12,7 @@ import {
   withPartCost,
 } from './breakdown';
 import { emptyAmounts } from './quantity';
-import { buildItems, itemCost, itemPacks, mergeDecisions, productMatcher } from './shopping';
+import { buildItems, itemCost, itemPacks, mergeDecisions, productResolver } from './shopping';
 import type { Meal, Product, Recipe, ShoppingItem } from './types';
 
 let counter = 0;
@@ -85,7 +85,7 @@ function list(lines: string[], products = byId): ShoppingItem[] {
   const items = buildItems(
     [meal('m1', 'r1')],
     new Map([['r1', recipe('r1', lines)]]),
-    productMatcher([...products.values()]),
+    productResolver([...products.values()]),
     newId,
   );
   return applyBreakdowns(items, products, newId);
@@ -238,7 +238,7 @@ describe('applyBreakdowns', () => {
     const fresh = buildItems(
       [meal('m1', 'r1')],
       new Map([['r1', recipe('r1', ['600 g chicken thighs'])]]),
-      productMatcher(all),
+      productResolver(all),
       newId,
     );
     const rebuilt = applyBreakdowns(mergeDecisions(fresh, items), byId, newId);

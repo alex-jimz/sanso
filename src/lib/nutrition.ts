@@ -4,7 +4,9 @@
 // A line that can't be worked out is listed with what's missing, so a total
 // can show how many ingredients it covers.
 
+import { ingredientRows, splitAlternatives } from './choices';
 import { isTapWater, normalizeName, parseIngredients, type ParsedLine } from './ingredients';
+import type { Resolver } from './matching';
 import type { Nutrition, Product, Recipe } from './types';
 import { getUnit } from './units';
 
@@ -179,20 +181,28 @@ export interface RecipeFacts {
   costCount: number;
 }
 
-/** The ingredient lines that matter: not headings, and not tap water. */
+/** The ingredient lines that matter, every alternative included: not headings, and not tap water. */
 export function countedLines(ingredients: string[]): ParsedLine[] {
-  return parseIngredients(ingredients).filter(
+  return parseIngredients(ingredients.flatMap(splitAlternatives)).filter(
     (line) => !line.heading && line.name && !isTapWater(normalizeName(line.name)),
   );
 }
 
+/**
+ * Per portion, for the picked option of each line. `priced` gives a product
+ * the price it's costed at, as parts take theirs from what they're cut from.
+ */
 export function recipeFacts(
   recipe: Pick<Recipe, 'ingredients' | 'portions'>,
-  match: (normalized: string) => Product | undefined,
+  resolve: Resolver,
+  choices?: string[],
+  priced: (product: Product) => Product = (p) => p,
 ): RecipeFacts {
-  const lines = countedLines(recipe.ingredients).map((line) =>
-    lineFacts(line, match(normalizeName(line.name))),
-  );
+  const lines = ingredientRows(recipe.ingredients, resolve, choices)
+    .filter((row) => !row.heading)
+    .map((row) => row.chosen)
+    .filter(({ line }) => line.name && !isTapWater(normalizeName(line.name)))
+    .map(({ line, product }) => lineFacts(line, product && priced(product)));
   const portions = recipe.portions > 0 ? recipe.portions : 1;
   const nutrition = zero();
   let cost = 0;

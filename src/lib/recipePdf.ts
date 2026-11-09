@@ -15,7 +15,7 @@ import {
   type PDFImage,
   type PDFPage,
 } from 'pdf-lib';
-import { displayParts, parseIngredients } from './ingredients';
+import { displayParts, parseIngredients, type ParsedLine } from './ingredients';
 import { formatKcal, formatMacro, type RecipeFacts } from './nutrition';
 import { formatMinutes, formatPrice } from './quantity';
 import type { Recipe } from './types';
@@ -24,6 +24,8 @@ export interface RecipePdfInput {
   recipe: Recipe;
   /** Portions to write the ingredients for. */
   portions: number;
+  /** The ingredient lines with options picked. Without them, every line is printed as typed. */
+  lines?: ParsedLine[];
   facts?: RecipeFacts;
   photo?: Blob;
   /** Shown in the footer, e.g. "6 Nov 2026". */
@@ -224,6 +226,7 @@ export function factsSummary(facts: RecipeFacts): string {
 
 export async function recipePdf(input: RecipePdfInput): Promise<Blob> {
   const { recipe, portions, facts, photo, date } = input;
+  const lines = input.lines ?? parseIngredients(recipe.ingredients);
   const doc = await PDFDocument.create();
   doc.setTitle(recipe.title);
   doc.setCreator('Sanso');
@@ -414,7 +417,6 @@ export async function recipePdf(input: RecipePdfInput): Promise<Blob> {
     column.y -= 10;
   }
 
-  const lines = parseIngredients(recipe.ingredients);
   const factor = recipe.portions > 0 ? portions / recipe.portions : 1;
   if (lines.length) {
     heading(left, 'Ingredients', portions === 1 ? 'For 1 portion' : `For ${portions} portions`);

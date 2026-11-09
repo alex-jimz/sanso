@@ -2,23 +2,14 @@
 // Lines for the same product (or, without a product, the same name) are merged,
 // scaled to each meal's portions, and sorted into "To buy" and "Check what you have".
 
-import { capitalize, isTapWater, normalizeName, parseIngredient, scaleLine } from './ingredients';
+import { ingredientRows } from './choices';
+import { capitalize, isTapWater, normalizeName, scaleLine } from './ingredients';
+import type { Resolver } from './matching';
 import { emptyAmounts } from './quantity';
 import type { Amounts, ItemPart, Meal, Product, Recipe, ShoppingItem } from './types';
 import { getUnit } from './units';
 
-export type Matcher = (normalized: string) => Product | undefined;
-
-/** Finds products by normalised name or by one of their aliases. */
-export function productMatcher(products: Product[]): Matcher {
-  const map = new Map<string, Product>();
-  for (const product of products) {
-    for (const alias of product.aliases) map.set(alias, product);
-  }
-  // Names win over aliases, so a product is always found by its own name.
-  for (const product of products) map.set(normalizeName(product.name), product);
-  return (normalized) => map.get(normalized);
-}
+export { productMatcher, productResolver, type Matcher, type Resolver } from './matching';
 
 export function addAmount(
   amounts: Amounts,
@@ -46,10 +37,11 @@ export function itemKey(product: Product | undefined, normalized: string): strin
   return product ? `p:${product.id}` : `n:${normalized}`;
 }
 
+/** Each meal uses its own picks for lines with options. */
 export function buildItems(
   meals: Meal[],
   recipeById: Map<string, Recipe>,
-  match: Matcher,
+  resolve: Resolver,
   newId: () => string,
 ): ShoppingItem[] {
   const items = new Map<string, ShoppingItem>();
@@ -59,12 +51,12 @@ export function buildItems(
     const recipe = recipeById.get(meal.recipeId);
     if (!recipe) continue;
     const factor = meal.portions / (recipe.portions || 1);
-    for (const raw of recipe.ingredients) {
-      const line = parseIngredient(raw);
-      if (!line || line.heading || !line.name) continue;
+    for (const row of ingredientRows(recipe.ingredients, resolve, meal.choices)) {
+      if (row.heading) continue;
+      const { line, product } = row.chosen;
+      if (!line.name) continue;
       const normalized = normalizeName(line.name);
       if (!normalized || isTapWater(normalized)) continue;
-      const product = match(normalized);
       if (product?.listMode === 'skip') continue;
       const key = itemKey(product, normalized);
       let item = items.get(key);

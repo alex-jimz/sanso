@@ -14,8 +14,13 @@ export interface Recipe {
   totalMinutes?: number;
   /** 0 to 10. Undefined until rated. */
   score?: number;
-  /** One line per ingredient, as typed. A line ending in ":" is a group heading. */
+  /**
+   * One line per ingredient, as typed. A line ending in ":" is a group heading.
+   * "or" between ingredients offers a choice, as in "600 g chicken thighs or 600 g chicken breast".
+   */
   ingredients: string[];
+  /** Options picked on the recipe page, as option keys from choices.ts. New meals start with them. */
+  choices?: string[];
   steps: string[];
   notes: string;
   createdAt: string;
@@ -91,6 +96,8 @@ export interface Product {
   listMode: ListMode;
   /** Normalised ingredient names that mean this product. */
   aliases: string[];
+  /** Normalised ingredient names its name contains that don't mean it, as "milk" for Coconut milk. */
+  notFor?: string[];
   offer?: Offer;
   createdAt: string;
   updatedAt: string;
@@ -119,6 +126,8 @@ export interface Meal {
   portions: number;
   state: MealState;
   note?: string;
+  /** Options picked for this meal, as option keys from choices.ts. Copied from the recipe when planned. */
+  choices?: string[];
 }
 
 /** What one shopping item adds up to, by kind of amount. */

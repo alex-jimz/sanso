@@ -10,7 +10,7 @@
   import { getPhoto } from '../lib/db';
   import ScorePicker from '../components/ScorePicker.svelte';
   import Stepper from '../components/Stepper.svelte';
-  import { normalizeName, parseIngredients } from '../lib/ingredients';
+  import type { ParsedLine } from '../lib/ingredients';
   import { resizePhoto } from '../lib/photos';
   import { formatAmount, formatNumber } from '../lib/quantity';
   import { parseSteps } from '../lib/recipes';
@@ -59,7 +59,7 @@
   let cropOpen = $state(false);
   let cropFile = $state<Blob | undefined>();
 
-  const parsed = $derived(parseIngredients(ingredientsText.split('\n')));
+  const rows = $derived(store.rowsFor({ ingredients: ingredientsText.split('\n') }, undefined));
   const hasPhoto = $derived(photo ? true : photo === null ? false : !!base.photoId);
 
   const dirty = $derived(
@@ -193,7 +193,7 @@
     router.go('/recipes', { replace: true });
   }
 
-  function describe(line: (typeof parsed)[number]): string {
+  function describe(line: ParsedLine): string {
     if (line.quantity === undefined) return '';
     return line.unit ? formatAmount(line.quantity, line.unit) : formatNumber(line.quantity);
   }
@@ -330,26 +330,35 @@
         placeholder={'600 g chicken breast\n3 garlic cloves\n1 onion, chopped\nFor the sauce:\n400 ml coconut milk\nsalt'}
       ></textarea>
       <span class="hint"
-        >One per line, the way you’d say it. A line ending in “:” starts a group.</span
+        >One per line, the way you’d say it. A line ending in “:” starts a group. Put “or” between
+        choices, as in “600 g chicken thighs or 600 g chicken breast”.</span
       >
     </label>
 
-    {#if parsed.some((l) => !l.heading)}
+    {#if rows.some((r) => !r.heading)}
       <div class="preview">
         <p class="eyebrow">Reads as</p>
         <ul>
-          {#each parsed as line, i (i)}
-            {#if line.heading}
-              <li class="group">{line.name}</li>
+          {#each rows as row, i (i)}
+            {#if row.heading}
+              <li class="group">{row.line.name}</li>
             {:else}
-              {@const product = store.match(normalizeName(line.name))}
-              <li>
-                <span class="amount" class:none={line.quantity === undefined}
-                  >{describe(line) || 'no amount'}</span
-                >
-                <span class="name">{line.name}</span>
-                {#if product}<span class="product">· {product.name}</span>{/if}
-              </li>
+              {#each row.alternatives as line, a (a)}
+                {@const products = row.options.filter(
+                  (o) => o.line.text === line.text && o.product,
+                )}
+                <li>
+                  <span class="amount" class:none={line.quantity === undefined}
+                    >{a > 0 ? 'or ' : ''}{describe(line) || 'no amount'}</span
+                  >
+                  <span class="name">{line.name}</span>
+                  {#if products[0]?.product}<span class="product"
+                      >· {products[0].product.name}{products.length > 1
+                        ? ` +${products.length - 1} more`
+                        : ''}</span
+                    >{/if}
+                </li>
+              {/each}
             {/if}
           {/each}
         </ul>

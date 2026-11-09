@@ -9,7 +9,7 @@ import {
   recipeFacts,
   weightsNeeded,
 } from './nutrition';
-import { productMatcher } from './shopping';
+import { productResolver } from './shopping';
 import type { Product } from './types';
 
 function product(name: string, extra: Partial<Product> = {}): Product {
@@ -118,7 +118,7 @@ describe('lineFacts', () => {
 
 describe('recipeFacts', () => {
   it('adds up per portion and counts the lines that are covered', () => {
-    const match = productMatcher([chicken, onion, garlic, salt]);
+    const match = productResolver([chicken, onion, garlic, salt]);
     const facts = recipeFacts(
       {
         portions: 2,

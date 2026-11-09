@@ -1,16 +1,20 @@
 <script lang="ts">
+  import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Repeat from '@lucide/svelte/icons/repeat';
   import Soup from '@lucide/svelte/icons/soup';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import UtensilsCrossed from '@lucide/svelte/icons/utensils-crossed';
   import { untrack } from 'svelte';
+  import { hasOptions, withChoice, type IngredientRow, type Option } from '../lib/choices';
   import { addDays, dayInSentence, relativeDay } from '../lib/dates';
+  import { capitalize, scaleLine } from '../lib/ingredients';
   import { router } from '../lib/router.svelte';
   import { mealStates, slotLabel } from '../lib/states';
   import { store } from '../lib/store.svelte';
   import type { Meal, Recipe, Slot } from '../lib/types';
   import { showToast } from '../lib/ui.svelte';
+  import ChoiceSheet from './ChoiceSheet.svelte';
   import RecipePhoto from './RecipePhoto.svelte';
   import RecipePicker from './RecipePicker.svelte';
   import Sheet from './Sheet.svelte';
@@ -29,6 +33,24 @@
       !store.mealById.get(`${nextDay}:lunch`),
   );
   const slotPhrase = $derived(`${dayInSentence(date)}’s ${slotLabel[slot].toLowerCase()}`);
+
+  const rows = $derived(recipe && meal ? store.rowsFor(recipe, meal.choices) : []);
+  const optionRows = $derived(rows.filter(hasOptions));
+  const factor = $derived(recipe && meal ? meal.portions / (recipe.portions || 1) : 1);
+  let choosing = $state(false);
+  let choiceRow = $state<IngredientRow | undefined>();
+
+  function openChoice(row: IngredientRow) {
+    choiceRow = row;
+    choosing = true;
+  }
+
+  async function pickOption(option: Option) {
+    const row = choiceRow;
+    if (!row) return;
+    await update({ choices: withChoice(rows, row, option.key) });
+    await store.learnPick(row, option);
+  }
 
   let picking = $state(false);
   let note = $state('');
@@ -53,6 +75,7 @@
         recipeId: chosen.id,
         state: wasNoCooking ? 'toShop' : meal.state,
         note: wasNoCooking ? undefined : meal.note,
+        choices: chosen.choices ? [...chosen.choices] : undefined,
       });
     } else {
       await store.planRecipe(date, slot, chosen.id);
@@ -83,6 +106,7 @@
       portions: store.settings.defaultPortions,
       state: meal.state,
       note: 'Leftovers',
+      choices: meal.choices ? [...meal.choices] : undefined,
     });
     showToast(`Leftovers planned for ${dayInSentence(nextDay)}’s lunch`);
   }
@@ -171,6 +195,27 @@
         </div>
       {/if}
 
+      {#if recipe && meal.state !== 'noCooking' && optionRows.length}
+        <div class="field">
+          <span class="field-label">Ingredients for this meal</span>
+          <ul class="list">
+            {#each optionRows as row, i (i)}
+              <li>
+                <button class="row" type="button" onclick={() => openChoice(row)}>
+                  <span class="row-main">
+                    <span class="row-title">{capitalize(scaleLine(row.chosen.line, factor))}</span>
+                    <span class="row-sub"
+                      >{row.chosen.product?.name ?? 'No product yet'} · {row.options.length} options</span
+                    >
+                  </span>
+                  <ArrowLeftRight size={18} />
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+
       <label class="field">
         <span class="field-label">Note</span>
         <input
@@ -189,6 +234,14 @@
     </div>
   {/if}
 </Sheet>
+
+<ChoiceSheet
+  bind:open={choosing}
+  row={choiceRow}
+  {factor}
+  portions={recipe?.portions ?? 1}
+  onpick={pickOption}
+/>
 
 <style>
   .no-cook {
