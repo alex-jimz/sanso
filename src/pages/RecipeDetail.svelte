@@ -1,14 +1,17 @@
 <script lang="ts">
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
   import CalendarPlus from '@lucide/svelte/icons/calendar-plus';
   import FileDown from '@lucide/svelte/icons/file-down';
   import Pencil from '@lucide/svelte/icons/pencil';
+  import ChoiceSheet from '../components/ChoiceSheet.svelte';
   import PlanPickerSheet from '../components/PlanPickerSheet.svelte';
   import PortionFacts from '../components/PortionFacts.svelte';
   import RecipePdfSheet from '../components/RecipePdfSheet.svelte';
   import RecipePhoto from '../components/RecipePhoto.svelte';
   import Stepper from '../components/Stepper.svelte';
-  import { displayParts, parseIngredients } from '../lib/ingredients';
+  import { hasOptions, withChoice, type IngredientRow, type Option } from '../lib/choices';
+  import { capitalize, displayParts } from '../lib/ingredients';
   import { formatMinutes } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
   import { store } from '../lib/store.svelte';
@@ -16,10 +19,24 @@
   let { id }: { id: string } = $props();
 
   const recipe = $derived(store.recipeById.get(id));
-  const lines = $derived(recipe ? parseIngredients(recipe.ingredients) : []);
+  const rows = $derived(recipe ? store.rowsFor(recipe, recipe.choices) : []);
   let portions = $state(1);
   let planning = $state(false);
   let exporting = $state(false);
+  let choosing = $state(false);
+  let choiceRow = $state<IngredientRow | undefined>();
+
+  function openChoice(row: IngredientRow) {
+    choiceRow = row;
+    choosing = true;
+  }
+
+  async function pick(option: Option) {
+    const row = choiceRow;
+    if (!recipe || !row) return;
+    await store.setRecipeChoices(recipe.id, withChoice(rows, row, option.key));
+    await store.learnPick(row, option);
+  }
 
   $effect(() => {
     if (recipe) portions = recipe.portions;
@@ -124,15 +141,24 @@
           </div>
           <Stepper bind:value={portions} label="Portions" />
         </div>
-        {#if lines.length}
+        {#if rows.length}
           <ul class="ingredients">
-            {#each lines as line, i (i)}
-              {#if line.heading}
-                <li class="group">{line.name}</li>
+            {#each rows as row, i (i)}
+              {#if row.heading}
+                <li class="group">{row.line.name}</li>
               {:else}
-                {@const parts = displayParts(line, factor)}
+                {@const parts = displayParts(row.chosen.line, factor)}
                 <li>
                   {parts.before}{#if parts.amount}<strong>{parts.amount}</strong>{/if}{parts.after}
+                  {#if hasOptions(row)}
+                    <button class="pick" type="button" onclick={() => openChoice(row)}>
+                      <ArrowLeftRight size={14} />
+                      <span
+                        >{row.chosen.product?.name ?? capitalize(row.chosen.line.name)} · {row
+                          .options.length} options</span
+                      >
+                    </button>
+                  {/if}
                 </li>
               {/if}
             {/each}
@@ -173,6 +199,13 @@
 
   <PlanPickerSheet bind:open={planning} {recipe} />
   <RecipePdfSheet bind:open={exporting} {recipe} {portions} />
+  <ChoiceSheet
+    bind:open={choosing}
+    row={choiceRow}
+    {factor}
+    portions={recipe.portions}
+    onpick={pick}
+  />
 {/if}
 
 <style>
@@ -308,6 +341,32 @@
 
   strong {
     font-weight: 750;
+  }
+
+  .pick {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    margin-top: 6px;
+    padding: 4px 10px;
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 650;
+  }
+
+  .pick span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pick :global(svg) {
+    flex: none;
   }
 
   .steps {

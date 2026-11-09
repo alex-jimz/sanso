@@ -1,6 +1,7 @@
 // End-to-end check of the built app in a Pixel 7-sized Chromium.
 // Writes screenshots, contact sheets and report.txt to /out.
 const fs = require('fs');
+const zlib = require('zlib');
 const { chromium, devices } = require('playwright-core');
 const { start } = require('./server.cjs');
 const { seed, testPhoto } = require('./seed.cjs');
@@ -895,6 +896,254 @@ async function backups(browser, github) {
   }
 }
 
+/** The text drawn in a PDF made by pdf-lib, as lowercase hex, which is how it writes text. */
+function pdfHexText(bytes) {
+  const raw = bytes.toString('latin1');
+  let out = '';
+  for (const m of raw.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
+    try {
+      out += zlib.inflateSync(Buffer.from(m[1], 'latin1')).toString('latin1');
+    } catch {
+      out += m[1];
+    }
+  }
+  return out.toLowerCase();
+}
+
+const hex = (text) => Buffer.from(text, 'latin1').toString('hex');
+
+// Ingredient options: "or" lines, and products matched by the words in their names.
+async function ingredientOptions(browser, github) {
+  const page = await newPhone(browser, github);
+  await page.goto(BASE);
+  await page.getByRole('heading', { name: 'Your recipe book is empty' }).waitFor();
+  await page.evaluate(async () => {
+    const now = new Date().toISOString();
+    const product = (id, name, packSize, packUnit, price, nutrition) => ({
+      id,
+      name,
+      shop: 'aldi',
+      packSize,
+      packUnit,
+      price,
+      nutrition,
+      listMode: 'auto',
+      aliases: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+    const recipe = (id, title, ingredients) => ({
+      id,
+      title,
+      tags: ['Meal'],
+      portions: 2,
+      ingredients,
+      steps: ['Cook everything.'],
+      notes: '',
+      createdAt: now,
+      updatedAt: now,
+    });
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('sanso', 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['recipes', 'products'], 'readwrite');
+      for (const r of [
+        recipe('tray', 'Chicken tray bake', [
+          '600 g chicken thighs OR 600 g chicken breast',
+          '1 kg potatoes or sweet potatoes',
+          '1 onion',
+        ]),
+        recipe('chilli', 'Beef chilli', ['500 g ground beef', '400 g kidney beans', '200 ml milk']),
+      ])
+        tx.objectStore('recipes').put(r);
+      for (const p of [
+        product('thighs', 'Chicken thighs', 1000, 'g', 5, {
+          kcal: 180,
+          protein: 18,
+          fat: 12,
+          carbs: 0,
+        }),
+        product('breast', 'Chicken breast', 1000, 'g', 8, {
+          kcal: 110,
+          protein: 23,
+          fat: 2,
+          carbs: 0,
+        }),
+        product('b10', 'Ground beef 10% fat', 500, 'g', 4, {
+          kcal: 176,
+          protein: 20,
+          fat: 10,
+          carbs: 0,
+        }),
+        product('b20', 'Ground beef 20% fat', 500, 'g', 3, {
+          kcal: 254,
+          protein: 17,
+          fat: 20,
+          carbs: 0,
+        }),
+        product('coconut', 'Coconut milk', 400, 'ml', 1.2, {
+          kcal: 197,
+          protein: 2,
+          fat: 20,
+          carbs: 3,
+        }),
+      ])
+        tx.objectStore('products').put(p);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  });
+  await page.reload();
+  await page.locator('.recipe').first().waitFor();
+
+  // An "or" line: the first option is picked to start with.
+  await page.goto(`${BASE}#/recipes/tray`);
+  await page.getByRole('heading', { name: 'Chicken tray bake' }).waitFor();
+  const ingredients = page.locator('.ingredients');
+  const chicken = ingredients.locator('li').nth(0);
+  let text = await chicken.innerText();
+  check(
+    text.includes('600 g chicken thighs') && !/OR/.test(text) && text.includes('2 options'),
+    'an “or” line shows its first option, with a button for the others',
+  );
+  check(
+    (await ingredients.locator('li').nth(1).innerText()).includes('1 kg potatoes'),
+    'an alternative without an amount is still a choice',
+  );
+  // 600 g thighs: 1080 kcal and €3.00, over 2 portions.
+  let facts = await page.locator('.facts').innerText();
+  check(facts.includes('540') && facts.includes('€1.50'), 'calories and cost use the first option');
+  await shot(page, '21 Ingredient options');
+
+  await chicken.getByRole('button').click();
+  const sheet = page.getByRole('dialog');
+  await sheet.waitFor();
+  text = await sheet.innerText();
+  check(
+    text.includes('540 kcal · €1.50 per portion') && text.includes('330 kcal · €2.40 per portion'),
+    'the picker shows each option’s calories and cost per portion',
+  );
+  await shot(page, '22 Choose an ingredient');
+  await sheet.getByRole('button', { name: /600 g chicken breast/ }).click();
+  await sheet.waitFor({ state: 'detached' });
+  facts = await page.locator('.facts').innerText();
+  check(
+    facts.includes('330') &&
+      facts.includes('€2.40') &&
+      (await chicken.innerText()).includes('breast'),
+    'picking chicken breast changes the line, the calories and the cost',
+  );
+  await savePdf(page, 'tray');
+  const tray = fs.readFileSync(`${OUT}/tray.pdf`);
+  const drawn = pdfHexText(tray);
+  check(
+    drawn.includes(hex('breast')) && !drawn.includes(hex('thighs')),
+    'the PDF lists the picked option only',
+  );
+
+  // Planned meals start with the recipe's picks.
+  await page.getByRole('button', { name: 'Add to plan' }).click();
+  await page.getByRole('dialog').waitFor();
+  await page.locator('.days li').nth(0).locator('.slot').nth(1).click();
+  await page.locator('.toast').filter({ hasText: 'Planned for' }).waitFor();
+  await page.getByRole('dialog').waitFor({ state: 'detached' });
+
+  // Two products whose names contain "ground beef".
+  await page.goto(`${BASE}#/recipes/chilli`);
+  await page.getByRole('heading', { name: 'Beef chilli' }).waitFor();
+  const beef = ingredients.locator('li').nth(0);
+  check(
+    (await beef.innerText()).includes('Ground beef 10% fat · 2 options'),
+    '“ground beef” matches both beef products by their names',
+  );
+  await beef.getByRole('button').click();
+  await sheet.waitFor();
+  await sheet.getByRole('button', { name: /Ground beef 20% fat/ }).click();
+  check(
+    await seeToast(page, 'Ground beef 20% fat is now the usual pick for “ground beef”'),
+    'the first product picked for a name becomes its usual pick',
+  );
+  // 500 g of 20% beef is 1270 kcal, and 200 ml milk matched to coconut milk 394, over 2 portions.
+  facts = await page.locator('.facts').innerText();
+  check(facts.includes('832'), 'the 20% beef’s calories are used');
+
+  // Coconut milk isn't milk: remove the name from the product.
+  await page.goto(`${BASE}#/more/products/coconut`);
+  await page.getByRole('button', { name: 'Don’t offer it for “milk”' }).click();
+  await page.locator('.alias.removed').waitFor();
+  await shot(page, '23 Not offered for');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.waitForURL((url) => !url.href.includes('/coconut'));
+  await page.goto(`${BASE}#/recipes/chilli`);
+  await page.getByRole('heading', { name: 'Beef chilli' }).waitFor();
+  facts = await page.locator('.facts').innerText();
+  check(
+    facts.includes('635') && facts.includes('From 1 of 3 ingredients'),
+    'milk no longer counts as coconut milk',
+  );
+  await page.getByRole('button', { name: 'Add to plan' }).click();
+  await page.getByRole('dialog').waitFor();
+  await page.locator('.days li').nth(1).locator('.slot').nth(1).click();
+  await page.locator('.toast').filter({ hasText: 'Planned for' }).waitFor();
+  await page.getByRole('dialog').waitFor({ state: 'detached' });
+
+  // A meal can pick differently from the recipe.
+  await page.goto(`${BASE}#/plan`);
+  await page.locator('.day.today .slot').nth(1).click();
+  const meal = page.getByRole('dialog', { name: 'Today · Dinner' });
+  await meal.getByText('Ingredients for this meal').waitFor();
+  await meal.getByRole('button', { name: /g chicken breast/ }).click();
+  const picker = page.getByRole('dialog', { name: 'Choose an ingredient' });
+  await picker.getByRole('button', { name: /g chicken thighs/ }).click();
+  await picker.waitFor({ state: 'detached' });
+  check(
+    (await meal.innerText()).includes('300 g chicken thighs'),
+    'the meal sheet changes the pick for that meal',
+  );
+  await shot(page, '24 Meal options');
+  await page.goBack();
+  await meal.waitFor({ state: 'detached' });
+  await page.goto(`${BASE}#/recipes/tray`);
+  check(
+    (await page.locator('.ingredients li').nth(0).innerText()).includes('breast'),
+    'and the recipe keeps its own pick',
+  );
+
+  // The list follows each meal's picks.
+  await page.goto(`${BASE}#/shopping`);
+  await page.getByRole('button', { name: 'Make a list' }).click();
+  await page.getByRole('dialog').waitFor();
+  await page.getByRole('button', { name: /Make the list/ }).click();
+  await page.locator('.item').first().waitFor();
+  const list = await page.locator('.page').innerText();
+  check(
+    list.includes('Chicken thighs') && !list.includes('Chicken breast'),
+    'the list has the meal’s chicken thighs, not the recipe’s breast',
+  );
+  check(
+    list.includes('Ground beef 20% fat') && !list.includes('10% fat'),
+    'and the beef that was picked',
+  );
+  check(list.includes('Potatoes') && !list.includes('Coconut milk'), 'and the other ingredients');
+  await shot(page, '25 List from picks');
+
+  // The editor shows how the options read.
+  await page.goto(`${BASE}#/recipes/tray/edit`);
+  const preview = await page.locator('.preview').innerText();
+  check(
+    preview.includes('or 600 g') &&
+      preview.includes('Chicken breast') &&
+      preview.includes('or 1 kg'),
+    'the editor’s preview lists each alternative and its product',
+  );
+  await collectCsp(page);
+  await page.context().close();
+}
+
 /** A fresh Pixel-sized browser profile: its own storage, as on another phone. */
 async function newPhone(browser, github, options = {}) {
   const context = await browser.newContext({
@@ -940,6 +1189,7 @@ async function main() {
     await run(page);
     await backups(browser, github);
     await breakdown(browser, github);
+    await ingredientOptions(browser, github);
   } catch (error) {
     problems.push(`stopped: ${error.message.split('\n')[0]}`);
     for (const context of browser.contexts()) for (const p of context.pages()) current = p;

@@ -3,6 +3,7 @@
   import Download from '@lucide/svelte/icons/download';
   import FileText from '@lucide/svelte/icons/file-text';
   import Share2 from '@lucide/svelte/icons/share-2';
+  import { chosenLines } from '../lib/choices';
   import { getPhoto } from '../lib/db';
   import { downloadFile } from '../lib/files';
   import { store } from '../lib/store.svelte';
@@ -46,6 +47,7 @@
       const blob = await recipePdf({
         recipe: $state.snapshot(target) as Recipe,
         portions: count,
+        lines: $state.snapshot(chosenLines(store.rowsFor(target, target.choices))),
         facts: store.factsFor(target),
         photo,
         date,

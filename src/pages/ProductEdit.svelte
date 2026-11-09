@@ -4,6 +4,7 @@
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
   import Plus from '@lucide/svelte/icons/plus';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import Tag from '@lucide/svelte/icons/tag';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import X from '@lucide/svelte/icons/x';
@@ -15,6 +16,7 @@
   import { readClipboardImage, resizePhoto } from '../lib/photos';
   import { addDays, formatDayMonth, todayISO } from '../lib/dates';
   import { normalizeName } from '../lib/ingredients';
+  import { wordMatch } from '../lib/matching';
   import {
     cleanNutrition,
     cleanWeights,
@@ -73,6 +75,7 @@
   let url = $state(base.url ?? '');
   let listMode = $state<ListMode>(base.listMode);
   let aliases = $state([...base.aliases]);
+  let notFor = $state([...(base.notFor ?? [])]);
   let onOffer = $state(!!base.offer && base.offer.until >= today);
   let offerPrice = $state(base.offer?.price.toFixed(2) ?? '');
   let offerUntil = $state(
@@ -175,12 +178,22 @@
   };
   const weightHints: Record<string, string> = { tsp: '5', tbsp: '15', clove: '5' };
 
+  const recipeLines = $derived(store.recipes.flatMap((r) => countedLines(r.ingredients)));
+  // Ingredient names in recipes that this product's name contains, as "ground beef" for Ground beef 10% fat.
+  const wordNames = $derived.by(() => {
+    const own = normalizeName(name);
+    const found = new Set<string>();
+    for (const line of recipeLines) {
+      const n = normalizeName(line.name);
+      if (n && n !== own && !aliases.includes(n) && !notFor.includes(n) && wordMatch(n, own))
+        found.add(n);
+    }
+    return [...found].sort();
+  });
   // Recipe lines that use this product, so the form can ask for the weights they need.
   const ownLines = $derived.by(() => {
-    const names = new Set([normalizeName(name), ...aliases]);
-    return store.recipes
-      .flatMap((r) => countedLines(r.ingredients))
-      .filter((line) => names.has(normalizeName(line.name)));
+    const names = new Set([normalizeName(name), ...aliases, ...wordNames]);
+    return recipeLines.filter((line) => names.has(normalizeName(line.name)));
   });
   const neededWeights = $derived(
     weightsNeeded({ weights: base.weights, packSize: parseDecimal(packSize), packUnit }, ownLines),
@@ -245,6 +258,7 @@
       url: safeUrl(url),
       listMode,
       aliases,
+      notFor,
       offer: onOffer && offer !== undefined ? { price: offer, until: offerUntil } : undefined,
       nutrition: cleanNutrition(
         Object.fromEntries(nutrientKeys.map((k) => [k, parseDecimal(nutrition[k])])),
@@ -704,7 +718,7 @@
       </span>
     </label>
 
-    {#if aliases.length}
+    {#if aliases.length || wordNames.length || notFor.length}
       <div class="field">
         <span class="field-label">Recipes that call it</span>
         <div class="chips wrap">
@@ -720,7 +734,37 @@
               </button>
             </span>
           {/each}
+          {#each wordNames as word (word)}
+            <span class="chip alias by-words">
+              {word}
+              <button
+                type="button"
+                aria-label={`Don’t offer it for “${word}”`}
+                onclick={() => (notFor = [...notFor, word])}
+              >
+                <X size={14} />
+              </button>
+            </span>
+          {/each}
+          {#each notFor as word (word)}
+            <span class="chip alias removed">
+              {word}
+              <button
+                type="button"
+                aria-label={`Offer it for “${word}” again`}
+                onclick={() => (notFor = notFor.filter((n) => n !== word))}
+              >
+                <RotateCcw size={14} />
+              </button>
+            </span>
+          {/each}
         </div>
+        {#if wordNames.length || notFor.length}
+          <span class="hint"
+            >Dashed names match because the product’s name contains them. Remove one to stop this
+            product being offered for it.</span
+          >
+        {/if}
       </div>
     {/if}
 
@@ -982,6 +1026,17 @@
     padding-right: 6px;
     background: var(--surface-2);
     border-color: transparent;
+  }
+
+  .alias.by-words {
+    border: 1.5px dashed var(--faint);
+    background: transparent;
+  }
+
+  .alias.removed {
+    color: var(--faint);
+    text-decoration: line-through;
+    background: transparent;
   }
 
   .alias button {

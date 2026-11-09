@@ -6,7 +6,8 @@
   import RecipePhoto from '../components/RecipePhoto.svelte';
   import StatePill from '../components/StatePill.svelte';
   import { addDays, formatDayMonth, relativeDay, todayISO } from '../lib/dates';
-  import { displayParts, parseIngredients } from '../lib/ingredients';
+  import { choiceSignature, chosenLines } from '../lib/choices';
+  import { displayParts, type ParsedLine } from '../lib/ingredients';
   import { router } from '../lib/router.svelte';
   import { slotLabel } from '../lib/states';
   import { store } from '../lib/store.svelte';
@@ -48,25 +49,41 @@
   }
 
   interface Dish {
+    /** The recipe id, plus the picks when they differ from the recipe's plain lines. */
+    key: string;
     recipe: Recipe;
+    lines: ParsedLine[];
     meals: Meal[];
     portions: number;
   }
 
+  // Meals of one recipe are cooked together, unless they picked different options.
   const dishes = $derived.by((): Dish[] => {
     const session = store.cooking;
     if (!session) return [];
-    const byRecipe = new Map<string, Meal[]>();
+    const byKey = new Map<string, Dish>();
     for (const id of session.mealIds) {
       const meal = store.mealById.get(id);
-      if (!meal?.recipeId || !store.recipeById.has(meal.recipeId)) continue;
-      byRecipe.set(meal.recipeId, [...(byRecipe.get(meal.recipeId) ?? []), meal]);
+      const recipe = meal?.recipeId ? store.recipeById.get(meal.recipeId) : undefined;
+      if (!meal || !recipe) continue;
+      const rows = store.rowsFor(recipe, meal.choices);
+      const signature = choiceSignature(rows);
+      const key = signature ? `${recipe.id}#${signature}` : recipe.id;
+      const dish = byKey.get(key);
+      if (dish) {
+        dish.meals.push(meal);
+        dish.portions += meal.portions;
+      } else {
+        byKey.set(key, {
+          key,
+          recipe,
+          lines: chosenLines(rows),
+          meals: [meal],
+          portions: meal.portions,
+        });
+      }
     }
-    return [...byRecipe].map(([recipeId, meals]) => ({
-      recipe: store.recipeById.get(recipeId)!,
-      meals,
-      portions: meals.reduce((sum, m) => sum + m.portions, 0),
-    }));
+    return [...byKey.values()];
   });
 
   const cooking = $derived(!!store.cooking);
@@ -176,7 +193,7 @@
     </header>
 
     <div class="stack">
-      {#each dishes as dish (dish.recipe.id)}
+      {#each dishes as dish (dish.key)}
         {@const recipe = dish.recipe}
         {@const factor = dish.portions / recipe.portions}
         <article class="dish card">
@@ -196,11 +213,11 @@
 
           <h3 class="eyebrow">Ingredients</h3>
           <ul class="ticks">
-            {#each parseIngredients(recipe.ingredients) as line, i (i)}
+            {#each dish.lines as line, i (i)}
               {#if line.heading}
                 <li class="group">{line.name}</li>
               {:else}
-                {@const key = `${recipe.id}:i:${i}`}
+                {@const key = `${dish.key}:i:${i}`}
                 {@const parts = displayParts(line, factor)}
                 <li>
                   <button
@@ -225,7 +242,7 @@
             <h3 class="eyebrow">Steps</h3>
             <ol class="ticks steps">
               {#each recipe.steps as step, i (i)}
-                {@const key = `${recipe.id}:s:${i}`}
+                {@const key = `${dish.key}:s:${i}`}
                 <li>
                   <button
                     type="button"

@@ -5,7 +5,7 @@ import {
   itemCost,
   mergeDecisions,
   packsNeeded,
-  productMatcher,
+  productResolver,
   unitPrice,
 } from './shopping';
 import type { Meal, Product, Recipe } from './types';
@@ -63,7 +63,7 @@ describe('buildItems', () => {
     const items = buildItems(
       [meal('2026-10-20:dinner', 'curry', 2), meal('2026-10-21:dinner', 'stew', 1)],
       recipes,
-      productMatcher([]),
+      productResolver([]),
       newId,
     );
     const byName = new Map(items.map((i) => [i.name, i]));
@@ -82,7 +82,7 @@ describe('buildItems', () => {
     const items = buildItems(
       [meal('2026-10-20:dinner', 'curry', 2, 'noCooking')],
       recipes,
-      productMatcher([]),
+      productResolver([]),
       newId,
     );
     expect(items).toHaveLength(0);
@@ -101,7 +101,7 @@ describe('buildItems', () => {
     const items = buildItems(
       [meal('2026-10-20:dinner', 'curry', 4), meal('2026-10-21:dinner', 'stew', 2)],
       recipes,
-      productMatcher(products),
+      productResolver(products),
       newId,
     );
     const chicken = items.find((i) => i.productId === 'p1');
@@ -118,7 +118,7 @@ describe('mergeDecisions', () => {
     const first = buildItems(
       [meal('2026-10-20:dinner', 'curry', 4)],
       recipes,
-      productMatcher([]),
+      productResolver([]),
       newId,
     );
     const garlic = first.find((i) => i.name === 'Garlic')!;
@@ -137,7 +137,7 @@ describe('mergeDecisions', () => {
     const fresh = buildItems(
       [meal('2026-10-20:dinner', 'curry', 4), meal('2026-10-21:dinner', 'stew', 2)],
       recipes,
-      productMatcher([]),
+      productResolver([]),
       newId,
     );
     const merged = mergeDecisions(fresh, first);

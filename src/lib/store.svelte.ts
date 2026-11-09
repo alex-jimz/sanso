@@ -20,13 +20,14 @@ import {
   sourceIndex,
   withPartCost,
 } from './breakdown';
+import { ingredientRows, type IngredientRow, type Option } from './choices';
 import { defaultSections, defaultSettings } from './defaults';
 import { capitalize, normalizeName } from './ingredients';
 import { cleanNutrition, cleanWeights, recipeFacts } from './nutrition';
 import { forgetPhotoUrls } from './photos';
 import type { ImportedRecipe } from './recipeFormat';
 import { emptyAmounts, formatAmounts } from './quantity';
-import { buildItems, mergeDecisions, productMatcher } from './shopping';
+import { buildItems, mergeDecisions, productResolver, type Matcher } from './shopping';
 import type {
   BackupSettings,
   CookingSession,
@@ -66,6 +67,7 @@ export function cleanRecipe(raw: Recipe): Recipe {
     tags: strings(raw.tags),
     portions: Number(raw.portions) > 0 ? Number(raw.portions) : 1,
     ingredients: strings(raw.ingredients),
+    choices: Array.isArray(raw.choices) ? strings(raw.choices) : undefined,
     steps: strings(raw.steps),
     notes: String(raw.notes ?? ''),
   };
@@ -84,6 +86,7 @@ export function cleanProduct(raw: Product): Product {
     shop: raw.shop === 'aldi' || raw.shop === 'lidl' ? raw.shop : 'any',
     listMode: raw.listMode === 'check' || raw.listMode === 'skip' ? raw.listMode : 'auto',
     aliases: strings(raw.aliases),
+    notFor: Array.isArray(raw.notFor) && raw.notFor.length ? strings(raw.notFor) : undefined,
   };
 }
 
@@ -109,16 +112,27 @@ class Store {
   sectionById = $derived(new Map(this.sections.map((s) => [s.id, s])));
   mealById = $derived(new Map(this.meals.map((m) => [m.id, m])));
   orderedSections = $derived([...this.sections].sort((a, b) => a.order - b.order));
-  match = $derived(productMatcher(this.products));
+  /** Products an ingredient name can mean, best first. */
+  resolve = $derived(productResolver(this.products));
+  /** The best product for an ingredient name. */
+  match: Matcher = $derived.by(() => {
+    const resolve = this.resolve;
+    return (name: string) => resolve(name)[0]?.product;
+  });
   /** Products that break down into each product, by the part's id. */
   sources = $derived(sourceIndex(this.products));
 
-  /** Calories, macros and cost per portion. Parts like chicken thighs are priced by their cost share. */
-  factsFor(recipe: Pick<Recipe, 'ingredients' | 'portions'>) {
-    return recipeFacts(recipe, (name) => {
-      const product = this.match(name);
-      return product && withPartCost(product, this.sources);
-    });
+  /** A recipe's ingredient lines with their options, picked as `choices` says. */
+  rowsFor(recipe: Pick<Recipe, 'ingredients'>, choices: string[] | undefined) {
+    return ingredientRows(recipe.ingredients, this.resolve, choices);
+  }
+
+  /** The price a product is costed at in recipes. Parts like chicken thighs take a share of what they're cut from. */
+  priced = (product: Product): Product => withPartCost(product, this.sources);
+
+  /** Calories, macros and cost per portion, for the recipe page's picks unless given others. */
+  factsFor(recipe: Pick<Recipe, 'ingredients' | 'portions' | 'choices'>, choices = recipe.choices) {
+    return recipeFacts(recipe, this.resolve, choices, this.priced);
   }
 
   /** Runs after every change to the data, e.g. to schedule a backup. */
@@ -206,6 +220,15 @@ class Store {
     return recipe;
   }
 
+  /** Saves the options picked on the recipe page. Not an edit, so the recipe's date stays. */
+  async setRecipeChoices(id: string, choices: string[]) {
+    const recipe = this.recipeById.get(id);
+    if (!recipe) return;
+    recipe.choices = choices.length ? choices : undefined;
+    const saved = plain(recipe);
+    await this.write(() => putRecord('recipes', saved));
+  }
+
   /** Deletes a recipe and removes it from upcoming meals that aren't cooked yet. */
   async deleteRecipe(id: string) {
     const recipe = this.recipeById.get(id);
@@ -254,6 +277,8 @@ class Store {
     else if (photo === null) product.photoId = undefined;
     const ownName = normalizeName(product.name);
     product.aliases = [...new Set(product.aliases.filter((a) => a && a !== ownName))];
+    const notFor = (product.notFor ?? []).filter((n) => !product.aliases.includes(n));
+    product.notFor = notFor.length ? [...new Set(notFor)] : undefined;
     product.updatedAt = nowISO();
     if (!this.productById.has(product.id)) product.createdAt = product.updatedAt;
 
@@ -306,6 +331,31 @@ class Store {
       return;
     }
     await this.saveProduct({ ...plain(product), aliases: [...product.aliases, alias] });
+  }
+
+  /** Stops a product being offered for an ingredient name that its name happens to contain. */
+  async notFor(productId: string, ingredientName: string) {
+    const product = this.productById.get(productId);
+    const name = normalizeName(ingredientName);
+    if (!product || !name || product.notFor?.includes(name)) return;
+    await this.saveProduct({
+      ...plain(product),
+      aliases: product.aliases.filter((a) => a !== name),
+      notFor: [...(product.notFor ?? []), name],
+    });
+  }
+
+  /**
+   * Picking a product that only matched by the words in its name makes it the
+   * default for that name in every recipe, if no product matched it exactly.
+   * Returns true when it did.
+   */
+  async learnPick(row: IngredientRow, option: Option): Promise<boolean> {
+    if (!option.product || option.exact) return false;
+    if (row.options.some((o) => o.exact && o.line.text === option.line.text)) return false;
+    await this.linkName(option.product.id, option.line.name);
+    showToast(`${option.product.name} is now the usual pick for “${option.line.name}”`);
+    return true;
   }
 
   async deleteProduct(id: string) {
@@ -385,7 +435,16 @@ class Store {
     recipeId: string,
     portions = this.settings.defaultPortions,
   ) {
-    const meal: Meal = { id: `${date}:${slot}`, date, slot, recipeId, portions, state: 'toShop' };
+    const choices = this.recipeById.get(recipeId)?.choices;
+    const meal: Meal = {
+      id: `${date}:${slot}`,
+      date,
+      slot,
+      recipeId,
+      portions,
+      state: 'toShop',
+      choices: choices ? [...choices] : undefined,
+    };
     await this.saveMeal(meal);
     return meal;
   }
@@ -401,7 +460,7 @@ class Store {
 
   private buildFor(mealIds: string[]): ShoppingItem[] {
     const meals = mealIds.map((id) => this.mealById.get(id)).filter((m): m is Meal => !!m);
-    return buildItems(meals, this.recipeById, this.match, newId);
+    return buildItems(meals, this.recipeById, this.resolve, newId);
   }
 
   private async saveList() {
