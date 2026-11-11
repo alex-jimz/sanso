@@ -339,6 +339,18 @@ async function portionFacts(page) {
   // €3.99 chicken, €0.35 yoghurt, €0.55 tomatoes, €0.52 cream, €0.38 rice.
   check(before.includes('€2.89'), 'and €2.89 per portion');
   check(before.includes('From 5 of 9 ingredients'), 'and how many ingredients it covers');
+  check(
+    (await card.locator('.ring path').count()) === 3 &&
+      (await card.locator('.ring').innerHTML()).includes(`>${kcal}<`),
+    'a ring shows protein, fat and carbs, with the calories in the middle',
+  );
+  const legend = (await card.locator('.legend').innerText()).replace(/\s+/g, ' ');
+  check(
+    /Protein 63 g \d+%/.test(legend) &&
+      /Fat \d+ g \d+%/.test(legend) &&
+      /Carbs \d+ g \d+%/.test(legend),
+    `the grams and shares sit next to the ring (${legend})`,
+  );
   await card.scrollIntoViewIfNeeded();
   await shot(page, '11b Per portion');
 
@@ -360,6 +372,10 @@ async function portionFacts(page) {
   check(
     (await page.locator('.weight-row').innerText()).includes('1 clove'),
     'the product form asks for the weight of a clove',
+  );
+  check(
+    await page.getByRole('button', { name: 'Use values for Garlic' }).isVisible(),
+    'the form offers the basic food values for garlic',
   );
   await page.getByLabel('Calories per 100 g').fill('149');
   await page.getByLabel('Protein per 100 g').fill('6,4');
@@ -1332,6 +1348,135 @@ async function offersPrices(browser, github) {
   await page.context().close();
 }
 
+/** Filling in fresh produce from the basic foods table, on a fresh phone. */
+async function basicFoodsFill(browser, github) {
+  const page = await newPhone(browser, github);
+  await page.goto(BASE);
+  await page.getByRole('heading', { name: 'Your recipe book is empty' }).waitFor();
+  await page.evaluate(async () => {
+    const now = new Date().toISOString();
+    const product = (id, name, extra = {}) => ({
+      id,
+      name,
+      shop: 'aldi',
+      sectionId: 'veg',
+      listMode: 'auto',
+      aliases: [],
+      createdAt: now,
+      updatedAt: now,
+      ...extra,
+    });
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('sanso', 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['recipes', 'products'], 'readwrite');
+      tx.objectStore('recipes').put({
+        id: 'soup',
+        title: 'Leek and potato soup',
+        tags: [],
+        portions: 2,
+        ingredients: ['2 leeks', '3 potatoes', '1 onion', '2 carrots', '3 garlic cloves'],
+        steps: ['Cook.'],
+        notes: '',
+        createdAt: now,
+        updatedAt: now,
+      });
+      for (const p of [
+        product('onion', 'Irish brown onions', { aliases: ['onion'] }),
+        product('carrot', 'Loose carrots', { aliases: ['carrot'] }),
+        product('leek', 'Leeks'),
+        product('potato', 'Rooster potatoes', { aliases: ['potato'] }),
+        // Its own label values stay; only the clove weight is added.
+        product('garlic', 'Garlic', { nutrition: { kcal: 150, protein: 6, fat: 1, carbs: 30 } }),
+        product('bread', 'Garlic bread'),
+      ])
+        tx.objectStore('products').put(p);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  });
+  await page.goto(`${BASE}#/more/products`);
+  await page.reload();
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+  await page.locator('.tools .chip', { hasText: /^Missing info/ }).click();
+  await page.getByRole('link', { name: /Fill in nutrition for fresh food/ }).click();
+  await page.getByRole('heading', { name: 'Basic foods' }).waitFor();
+
+  const ready = page.locator('section', { hasText: 'Ready to fill in' });
+  const readyText = await ready.innerText();
+  check(
+    /Irish brown onions\s*As Onion\s*40 kcal · P 1.1 g · F 0.1 g · C 7.6 g · 1 piece 110 g/.test(
+      readyText,
+    ),
+    'the onions are matched to Onion, with its values and piece weight',
+  );
+  check(
+    readyText.includes('Leeks') &&
+      readyText.includes('Rooster potatoes') &&
+      readyText.includes('Loose carrots'),
+    'leeks, potatoes and carrots are matched too',
+  );
+  check(
+    /Garlic\s*As Garlic\s*1 clove 3 g/.test(readyText) &&
+      !/Garlic\s*As Garlic\s*149 kcal/.test(readyText),
+    'garlic with its own nutrition only gets the clove weight',
+  );
+  const noMatch = await page.locator('section', { hasText: 'No match' }).innerText();
+  check(noMatch.includes('Garlic bread'), 'Garlic bread isn’t taken for garlic');
+  await shot(page, '27 Basic foods');
+
+  // Garlic bread can still be given a food by hand; skip it and the carrots instead.
+  await page.getByRole('button', { name: 'Skip Loose carrots' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  check(await seeToast(page, 'Filled in 4 products'), 'saving fills in the ticked products');
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+
+  await page.goto(`${BASE}#/more/products/onion`);
+  check(
+    (await page.getByLabel('Calories per 100 g').inputValue()) === '40' &&
+      (await page.locator('.weight-row', { hasText: '1 piece' }).locator('input').inputValue()) ===
+        '110',
+    'the onion now has its calories and the weight of one onion',
+  );
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  // In the form: the carrots get their values from the suggestion button.
+  await page.goto(`${BASE}#/more/products/carrot`);
+  await page.getByRole('button', { name: 'Use values for Carrot' }).click();
+  check(
+    (await page.getByLabel('Calories per 100 g').inputValue()) === '41' &&
+      (await page.locator('.filled').innerText()).includes('Carrots, raw'),
+    'the form fills in a suggested food and says where the values come from',
+  );
+  await page.locator('.nutrients').scrollIntoViewIfNeeded();
+  await shot(page, '28 Product from basic foods');
+  await page.getByRole('button', { name: 'Other basic food' }).click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByPlaceholder('Search, like onion or chicken').fill('parsnip');
+  await sheet.getByRole('button', { name: /^Parsnip/ }).click();
+  check(
+    (await page.getByLabel('Calories per 100 g').inputValue()) === '75',
+    'another food can be picked from the table',
+  );
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+
+  await page.goto(`${BASE}#/recipes/soup`);
+  const facts = await page.locator('.facts').innerText();
+  check(
+    facts.includes('Calories from 5 of 5 ingredients') || facts.includes('From 5 of 5'),
+    `the soup counts all five ingredients for calories (${facts.split('\n').at(-1)})`,
+  );
+  await page.locator('.facts').scrollIntoViewIfNeeded();
+  await shot(page, '29 Soup per portion');
+  await collectCsp(page);
+  await page.context().close();
+}
+
 /** A fresh Pixel-sized browser profile: its own storage, as on another phone. */
 async function newPhone(browser, github, options = {}) {
   const context = await browser.newContext({
@@ -1379,6 +1524,7 @@ async function main() {
     await breakdown(browser, github);
     await ingredientOptions(browser, github);
     await offersPrices(browser, github);
+    await basicFoodsFill(browser, github);
   } catch (error) {
     problems.push(`stopped: ${error.message.split('\n')[0]}`);
     for (const context of browser.contexts()) for (const p of context.pages()) current = p;

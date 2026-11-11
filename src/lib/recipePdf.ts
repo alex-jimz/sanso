@@ -16,6 +16,14 @@ import {
   type PDFPage,
 } from 'pdf-lib';
 import { displayParts, parseIngredients, type ParsedLine } from './ingredients';
+import {
+  macroColors,
+  macroLabels,
+  macroShares,
+  macroText,
+  ringSegments,
+  segmentPath,
+} from './macroChart';
 import { formatKcal, formatMacro, type RecipeFacts } from './nutrition';
 import { formatMinutes, formatPrice } from './quantity';
 import type { Recipe } from './types';
@@ -53,8 +61,6 @@ const c = {
   muted: hex('#766d63'),
   accent: hex('#2f5d50'),
   accentSoft: hex('#e1ebe6'),
-  onAccent: hex('#fbf7f1'),
-  onAccentMuted: hex('#bcd2c9'),
   mustardSoft: hex('#f8ebcf'),
   mustardText: hex('#5a4316'),
 };
@@ -334,44 +340,100 @@ export async function recipePdf(input: RecipePdfInput): Promise<Blob> {
   });
   y -= statsHeight;
 
-  // Calories, macros and cost per portion.
+  // Calories, macros and cost per portion: the ring, the macros in their colours, then cost.
   if (facts && facts.lines.length && (facts.nutritionCount || facts.costCount)) {
     y -= 12;
-    const panel = 70;
-    roundedRect(first, M, y, W - 2 * M, panel, 14, c.accent);
-    first.drawText('PER PORTION', {
-      x: M + 16,
-      y: y - 18,
-      size: 7,
-      font: bold,
-      color: c.onAccentMuted,
-    });
+    const panel = 120;
+    roundedRect(first, M, y, W - 2 * M, panel, 14, c.surface);
+    first.drawText('PER PORTION', { x: M + 16, y: y - 18, size: 7, font: bold, color: c.muted });
+
     const n = facts.nutrition;
     const has = facts.nutritionCount > 0;
-    const cells = [
-      { value: has ? formatKcal(n.kcal) : '–', label: 'kcal' },
-      { value: has ? formatMacro(n.protein) : '–', label: 'Protein' },
-      { value: has ? formatMacro(n.fat) : '–', label: 'Fat' },
-      { value: has ? formatMacro(n.carbs) : '–', label: 'Carbs' },
-      { value: facts.costCount ? formatPrice(facts.cost) : '–', label: 'Cost' },
-    ];
-    const cellWidth = (W - 2 * M - 16) / cells.length;
-    cells.forEach((cell, i) => {
-      const x = M + 16 + cellWidth * i;
-      first.drawText(clean(cell.value), {
-        x,
-        y: y - 42,
-        size: 17,
-        font: serif,
-        color: c.onAccent,
+    const shares = macroShares(n);
+    const outer = 40;
+    const cx = M + 16 + outer;
+    const cy = y - 72;
+    const segments = has ? ringSegments(shares) : [];
+    if (segments.length) {
+      for (const s of segments)
+        first.drawSvgPath(segmentPath(0, 0, outer, outer - 8, s.start, s.end), {
+          x: cx,
+          y: cy,
+          color: hex(macroColors[s.key]),
+          borderWidth: 0,
+        });
+    } else {
+      first.drawSvgPath(segmentPath(0, 0, outer, outer - 8, 0, 360), {
+        x: cx,
+        y: cy,
+        color: c.surface2,
+        borderWidth: 0,
       });
-      first.drawText(cell.label, {
-        x,
-        y: y - 57,
-        size: 8,
-        font: sans,
-        color: c.onAccentMuted,
+    }
+    const kcal = has ? formatKcal(n.kcal) : '–';
+    first.drawText(kcal, {
+      x: cx - serif.widthOfTextAtSize(kcal, 19) / 2,
+      y: cy - 2,
+      size: 19,
+      font: serif,
+      color: c.text,
+    });
+    first.drawText('kcal', {
+      x: cx - sans.widthOfTextAtSize('kcal', 8) / 2,
+      y: cy - 14,
+      size: 8,
+      font: sans,
+      color: c.muted,
+    });
+
+    if (has) {
+      const x0 = cx + outer + 22;
+      const width = 178;
+      shares.forEach((s, i) => {
+        const top = y - 30 - i * 29;
+        roundedRect(first, x0, top, width, 24, 7, hex(macroColors[s.key]));
+        const text = hex(macroText);
+        first.drawText(macroLabels[s.key], {
+          x: x0 + 10,
+          y: top - 16,
+          size: 9,
+          font: bold,
+          color: text,
+        });
+        const grams = formatMacro(s.grams);
+        first.drawText(grams, {
+          x: x0 + 128 - serif.widthOfTextAtSize(grams, 12),
+          y: top - 16.5,
+          size: 12,
+          font: serif,
+          color: text,
+        });
+        const pct = `${Math.round(s.share * 100)}%`;
+        first.drawText(pct, {
+          x: x0 + width - 10 - sans.widthOfTextAtSize(pct, 8.5),
+          y: top - 16,
+          size: 8.5,
+          font: sans,
+          color: text,
+        });
       });
+    }
+
+    const cost = facts.costCount ? formatPrice(facts.cost) : '–';
+    const right = W - M - 18;
+    first.drawText('COST', {
+      x: right - bold.widthOfTextAtSize('COST', 7),
+      y: y - 52,
+      size: 7,
+      font: bold,
+      color: c.muted,
+    });
+    first.drawText(clean(cost), {
+      x: right - serif.widthOfTextAtSize(clean(cost), 22),
+      y: y - 78,
+      size: 22,
+      font: serif,
+      color: c.accent,
     });
     y -= panel;
     y -= 14;

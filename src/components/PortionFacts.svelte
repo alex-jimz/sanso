@@ -2,6 +2,14 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { capitalize } from '../lib/ingredients';
   import {
+    macroColors,
+    macroLabels,
+    macroShares,
+    macroText,
+    ringSegments,
+    segmentPath,
+  } from '../lib/macroChart';
+  import {
     formatKcal,
     formatMacro,
     weightLabel,
@@ -22,6 +30,8 @@
   const hasCost = $derived(facts.costCount > 0);
   const complete = $derived(facts.nutritionCount === total && facts.costCount === total);
   const gaps = $derived(facts.lines.filter((l) => l.missing.length));
+  const shares = $derived(macroShares(facts.nutrition));
+  const segments = $derived(ringSegments(shares));
   let open = $state(false);
 
   function describe(missing: Missing[], product: Product | undefined): string {
@@ -62,24 +72,37 @@
       {#if hasCost}<span class="cost">{formatPrice(facts.cost)}</span>{/if}
     </div>
     {#if hasNutrition}
-      <dl class="grid">
-        <div class="kcal">
-          <dt>kcal</dt>
-          <dd>{formatKcal(facts.nutrition.kcal)}</dd>
-        </div>
-        <div>
-          <dt>Protein</dt>
-          <dd>{formatMacro(facts.nutrition.protein)}</dd>
-        </div>
-        <div>
-          <dt>Fat</dt>
-          <dd>{formatMacro(facts.nutrition.fat)}</dd>
-        </div>
-        <div>
-          <dt>Carbs</dt>
-          <dd>{formatMacro(facts.nutrition.carbs)}</dd>
-        </div>
-      </dl>
+      <div class="macros">
+        <svg
+          class="ring"
+          viewBox="0 0 120 120"
+          role="img"
+          aria-label={`${formatKcal(facts.nutrition.kcal)} kcal: ${shares
+            .map((s) => `${macroLabels[s.key]} ${formatMacro(s.grams)}`)
+            .join(', ')}`}
+        >
+          {#if segments.length}
+            {#each segments as s (s.key)}
+              <path d={segmentPath(60, 60, 57, 48, s.start, s.end)} fill={macroColors[s.key]} />
+            {/each}
+          {:else}
+            <circle class="empty-ring" cx="60" cy="60" r="52.5" />
+          {/if}
+          <text class="ring-kcal" x="60" y="64" text-anchor="middle"
+            >{formatKcal(facts.nutrition.kcal)}</text
+          >
+          <text class="ring-unit" x="60" y="82" text-anchor="middle">kcal</text>
+        </svg>
+        <ul class="legend">
+          {#each shares as s (s.key)}
+            <li style={`background:${macroColors[s.key]};color:${macroText}`}>
+              <span class="macro-name">{macroLabels[s.key]}</span>
+              <span class="macro-grams">{formatMacro(s.grams)}</span>
+              <span class="macro-share">{Math.round(s.share * 100)}%</span>
+            </li>
+          {/each}
+        </ul>
+      </div>
     {:else}
       <p class="hint">
         Add nutrition and prices to this recipe’s products to see calories and cost here.
@@ -146,38 +169,73 @@
     font-weight: 600;
   }
 
-  .grid {
+  .macros {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    margin: 10px 0 4px;
+    grid-template-columns: 124px 1fr;
+    align-items: center;
+    gap: 16px;
+    margin: 12px 0 8px;
   }
 
-  .grid div {
-    display: grid;
-    gap: 2px;
+  .ring {
+    display: block;
+    width: 124px;
+    height: 124px;
   }
 
-  .grid div + div {
-    padding-left: 12px;
-    border-left: 1px solid var(--line);
+  .empty-ring {
+    fill: none;
+    stroke: var(--surface-3);
+    stroke-width: 9;
   }
 
-  dt {
-    color: var(--muted);
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-
-  dd {
-    margin: 0;
+  .ring-kcal {
+    fill: var(--text);
     font-family: var(--font-display);
-    font-size: 1.125rem;
-    font-weight: 600;
+    font-size: 27px;
+    font-weight: 650;
+  }
+
+  .ring-unit {
+    fill: var(--muted);
+    font-family: var(--font-ui);
+    font-size: 12px;
+  }
+
+  .legend {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .legend li {
+    display: grid;
+    grid-template-columns: 1fr auto 3.2em;
+    align-items: baseline;
+    gap: 8px;
+    padding: 7px 11px;
+    border-radius: var(--radius-sm);
+  }
+
+  .macro-name {
+    font-size: 0.875rem;
+    font-weight: 650;
+  }
+
+  .macro-grams {
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 650;
     white-space: nowrap;
   }
 
-  .kcal dd {
-    color: var(--accent);
+  .macro-share {
+    font-size: 0.8125rem;
+    opacity: 0.75;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
 
   .facts > .hint {
