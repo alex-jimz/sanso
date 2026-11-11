@@ -49,7 +49,10 @@ export interface PricePoint {
   price: number;
 }
 
-/** Per 100 g, or per 100 ml for products sold by volume, as on EU labels. */
+/**
+ * Per 100 g, or per 100 ml for products sold by volume, as on EU labels.
+ * Per piece instead when the product's `nutritionPer` is "piece".
+ */
 export interface Nutrition {
   kcal?: number;
   /** Grams. */
@@ -83,6 +86,8 @@ export interface Product {
   /** A photo stored on the phone. Shown instead of `imageUrl`. */
   photoId?: string;
   nutrition?: Nutrition;
+  /** "piece" when `nutrition` is per piece, as for a stock cube. Otherwise it's per 100 g or ml. */
+  nutritionPer?: 'piece';
   /** Salt, spices and the like: counted as zero calories and zero cost. */
   negligible?: boolean;
   /**

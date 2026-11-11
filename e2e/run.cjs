@@ -245,8 +245,14 @@ async function run(page) {
     'finishing the shop makes the meals ready to cook',
   );
 
-  // Cooking.
-  await page.getByRole('link', { name: 'Cook' }).click();
+  // Cooking, opened from the Plan page.
+  await page.getByRole('link', { name: 'Plan' }).click();
+  await page.getByRole('heading', { name: 'Plan', exact: true }).waitFor();
+  check(
+    (await page.locator('.cook-banner').innerText()).includes('Dinner:'),
+    "the Plan page offers to cook today's dinner",
+  );
+  await page.locator('.cook-banner').click();
   await page.getByRole('heading', { name: 'Cook', exact: true }).waitFor();
   check(
     (await page.locator('.check.on').count()) === 2,
@@ -261,8 +267,38 @@ async function run(page) {
   await page.locator('.ticks button').first().click();
   await page.locator('.steps button').first().click();
   await shot(page, '9 Cooking');
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByRole('heading', { name: 'Plan', exact: true }).waitFor();
+  check(
+    (await page.locator('.cook-banner').innerText()).includes('Cooking now') &&
+      (await page.getByLabel('Cooking in progress').count()) === 1,
+    'while cooking, the Plan page and its tab lead back to the recipes',
+  );
+  await page.locator('.cook-banner').click();
+  await page.getByRole('heading', { name: 'Cooking', exact: true }).waitFor();
+  check(
+    (await page.locator('.ticks button.done').count()) === 2,
+    'going back to cooking keeps the ticks',
+  );
   await page.getByRole('button', { name: 'Done cooking' }).click();
-  check((await toastText(page)).includes('cooked'), 'finishing cooking marks the meals as cooked');
+  check(await seeToast(page, 'marked as cooked'), 'finishing cooking marks the meals as cooked');
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByRole('heading', { name: 'Plan', exact: true }).waitFor();
+
+  // Products has its own tab, and addresses from before the move still work.
+  await page.getByRole('link', { name: 'Products' }).click();
+  await page.getByRole('heading', { name: 'Products', exact: true }).waitFor();
+  check(
+    (await page.locator('nav.tabbar a[aria-current="page"]').innerText()).includes('Products'),
+    'Products is a tab',
+  );
+  await page.goto(`${BASE}#/more/products`);
+  await page.getByRole('heading', { name: 'Products', exact: true }).waitFor();
+  check(page.url().endsWith('#/products'), 'the old Products address opens the Products tab');
+  await page.goto(`${BASE}#/cook`);
+  await page.getByRole('heading', { name: 'Cook', exact: true }).waitFor();
+  check(page.url().endsWith('#/plan/cook'), 'the old Cook address opens Cook in Plan');
+  await page.goto(`${BASE}#/recipes`);
 
   // More, products.
   await page.getByRole('link', { name: 'More' }).click();
@@ -454,7 +490,7 @@ async function breakdown(browser, github) {
   await page.locator('.recipe').first().waitFor();
 
   // The whole chicken and its parts.
-  await page.goto(`${BASE}#/more/products/new?name=${encodeURIComponent('Whole chicken XL')}`);
+  await page.goto(`${BASE}#/products/new?name=${encodeURIComponent('Whole chicken XL')}`);
   await page.getByRole('heading', { name: 'New product' }).waitFor();
   await page.getByPlaceholder('500', { exact: true }).fill('2200');
   await page.getByPlaceholder('1.89').fill('7.99');
@@ -556,7 +592,7 @@ async function breakdown(browser, github) {
   // A photo pasted from the clipboard.
   const photo = await page.evaluate(testPhoto);
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
-  await page.goto(`${BASE}#/more/products`);
+  await page.goto(`${BASE}#/products`);
   await page.getByText('Chicken thighs').click();
   await page.getByRole('heading', { name: 'Product', exact: true }).waitFor();
   await page.evaluate(async (base64) => {
@@ -685,7 +721,7 @@ async function runHelper(page, bookmark) {
 }
 
 async function aldi(page) {
-  await page.goto(`${BASE}#/more/products`);
+  await page.goto(`${BASE}#/products`);
   await page.getByRole('link', { name: /Get prices and photos from aldi.ie/ }).click();
   await page.getByRole('heading', { name: 'Prices from aldi.ie' }).waitFor();
   await page.getByRole('button', { name: 'Show the helper’s text' }).click();
@@ -1100,7 +1136,7 @@ async function ingredientOptions(browser, github) {
   check(facts.includes('832'), 'the 20% beef’s calories are used');
 
   // Coconut milk isn't milk: remove the name from the product.
-  await page.goto(`${BASE}#/more/products/coconut`);
+  await page.goto(`${BASE}#/products/coconut`);
   await page.getByRole('button', { name: 'Don’t offer it for “milk”' }).click();
   await page.locator('.alias.removed').waitFor();
   await shot(page, '23 Not offered for');
@@ -1240,7 +1276,7 @@ async function offersPrices(browser, github) {
     });
     db.close();
   });
-  await page.goto(`${BASE}#/more/products`);
+  await page.goto(`${BASE}#/products`);
   await page.reload();
   await page.getByRole('heading', { name: 'Products' }).waitFor();
   const chip = (name) => page.locator('.tools .chip', { hasText: new RegExp(`^${name}`) });
@@ -1256,7 +1292,7 @@ async function offersPrices(browser, github) {
   );
 
   // Adding an offer: pick the Thursday it starts, and the end is set.
-  await page.goto(`${BASE}#/more/products/rice`);
+  await page.goto(`${BASE}#/products/rice`);
   await page.getByRole('button', { name: 'Add an offer' }).click();
   await page.getByPlaceholder('1.49').fill('1.49');
   const weeks = page.locator('.weeks .week');
@@ -1294,7 +1330,7 @@ async function offersPrices(browser, github) {
   check(!(await rowNames()).includes('Basmati rice'), 'next week’s offer isn’t on now');
 
   // The price graph: the rice went up today and has next week's offer ahead.
-  await page.goto(`${BASE}#/more/products/rice`);
+  await page.goto(`${BASE}#/products/rice`);
   const history = page.locator('.card', { hasText: 'Price history' });
   await history.waitFor();
   let historyText = await history.innerText();
@@ -1312,7 +1348,7 @@ async function offersPrices(browser, github) {
   );
   await page.getByRole('button', { name: 'Cancel' }).click();
 
-  await page.goto(`${BASE}#/more/products/mince`);
+  await page.goto(`${BASE}#/products/mince`);
   await history.waitFor();
   historyText = await history.innerText();
   check(
@@ -1411,7 +1447,7 @@ async function basicFoodsFill(browser, github) {
     });
     db.close();
   });
-  await page.goto(`${BASE}#/more/products`);
+  await page.goto(`${BASE}#/products`);
   await page.reload();
   await page.getByRole('heading', { name: 'Products' }).waitFor();
   await page.locator('.tools .chip', { hasText: /^Missing info/ }).click();
@@ -1447,7 +1483,7 @@ async function basicFoodsFill(browser, github) {
   check(await seeToast(page, 'Filled in 4 products'), 'saving fills in the ticked products');
   await page.getByRole('heading', { name: 'Products' }).waitFor();
 
-  await page.goto(`${BASE}#/more/products/onion`);
+  await page.goto(`${BASE}#/products/onion`);
   check(
     (await page.getByLabel('Calories per 100 g').inputValue()) === '40' &&
       (await page.locator('.weight-row', { hasText: '1 piece' }).locator('input').inputValue()) ===
@@ -1457,7 +1493,7 @@ async function basicFoodsFill(browser, github) {
   await page.getByRole('button', { name: 'Cancel' }).click();
 
   // In the form: the carrots get their values from the suggestion button.
-  await page.goto(`${BASE}#/more/products/carrot`);
+  await page.goto(`${BASE}#/products/carrot`);
   await page.getByRole('button', { name: 'Use values for Carrot' }).click();
   check(
     (await page.getByLabel('Calories per 100 g').inputValue()) === '41' &&
@@ -1485,6 +1521,92 @@ async function basicFoodsFill(browser, github) {
   );
   await page.locator('.facts').scrollIntoViewIfNeeded();
   await shot(page, '29 Soup per portion');
+  await collectCsp(page);
+  await page.context().close();
+}
+
+/** Nutrition per piece for a stock cube, on a fresh phone. */
+async function perPiece(browser, github) {
+  const page = await newPhone(browser, github);
+  await page.goto(BASE);
+  await page.getByRole('heading', { name: 'Your recipe book is empty' }).waitFor();
+  await page.evaluate(async () => {
+    const now = new Date().toISOString();
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('sanso', 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['recipes', 'products'], 'readwrite');
+      tx.objectStore('recipes').put({
+        id: 'broth',
+        title: 'Quick broth',
+        tags: [],
+        portions: 2,
+        ingredients: ['2 stock cubes'],
+        steps: ['Dissolve in boiling water.'],
+        notes: '',
+        createdAt: now,
+        updatedAt: now,
+      });
+      tx.objectStore('products').put({
+        id: 'cubes',
+        name: 'Chicken stock cubes',
+        shop: 'aldi',
+        listMode: 'auto',
+        aliases: ['stock cube'],
+        packSize: 12,
+        packUnit: 'pcs',
+        price: 0.6,
+        createdAt: now,
+        updatedAt: now,
+      });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  });
+  await page.goto(`${BASE}#/products/cubes`);
+  await page.reload();
+  await page.getByRole('heading', { name: 'Product', exact: true }).waitFor();
+  check(
+    (await page.locator('.weight-row', { hasText: '1 piece' }).count()) === 1,
+    'per 100 g, "2 stock cubes" needs the weight of one cube',
+  );
+  await page.getByRole('button', { name: 'Per piece', exact: true }).click();
+  check(
+    (await page.locator('.weight-row').count()) === 0,
+    'per piece, the cube weight isn’t needed',
+  );
+  for (const [label, value] of [
+    ['Calories', '20'],
+    ['Protein', '0.5'],
+    ['Fat', '1.2'],
+    ['Carbs', '1.8'],
+  ])
+    await page.getByLabel(`${label} per piece`).fill(value);
+  await page.locator('.nutrients').scrollIntoViewIfNeeded();
+  await shot(page, '31 Nutrition per piece');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('heading', { name: 'Products', exact: true }).waitFor();
+
+  await page.goto(`${BASE}#/recipes/broth`);
+  const facts = await page.locator('.facts').innerText();
+  check(
+    /\b20\b/.test(facts) &&
+      /1 of 1|all/i.test(facts) &&
+      (await page.locator('.status').count()) === 0,
+    `two cubes for 2 portions give 20 kcal a portion, and the line is complete (${facts.replace(/\s+/g, ' ')})`,
+  );
+  await page.goto(`${BASE}#/products/cubes`);
+  check(
+    (await page
+      .getByRole('button', { name: 'Per piece', exact: true })
+      .getAttribute('aria-pressed')) === 'true' &&
+      (await page.getByLabel('Calories per piece').inputValue()) === '20',
+    'the product keeps its values per piece',
+  );
   await collectCsp(page);
   await page.context().close();
 }
@@ -1696,6 +1818,7 @@ async function main() {
     await offersPrices(browser, github);
     await basicFoodsFill(browser, github);
     await ingredientMatching(browser, github);
+    await perPiece(browser, github);
   } catch (error) {
     problems.push(`stopped: ${error.message.split('\n')[0]}`);
     for (const context of browser.contexts()) for (const p of context.pages()) current = p;

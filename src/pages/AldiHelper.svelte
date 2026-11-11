@@ -25,7 +25,7 @@
       class="icon-btn"
       type="button"
       aria-label="Back"
-      onclick={() => router.back('/more/products')}
+      onclick={() => router.back('/products')}
     >
       <ArrowLeft size={22} />
     </button>

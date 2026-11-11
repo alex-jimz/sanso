@@ -121,6 +121,8 @@
     Object.fromEntries(nutrientKeys.map((k) => [k, base.nutrition?.[k]?.toString() ?? ''])),
   );
   let negligible = $state(!!base.negligible);
+  let perPiece = $state(base.nutritionPer === 'piece');
+  const per100Label = $derived(`100 ${packUnit === 'ml' ? 'ml' : 'g'}`);
   let weights = $state<Record<string, string>>(
     Object.fromEntries(Object.entries(base.weights ?? {}).map(([k, v]) => [k, String(v)])),
   );
@@ -238,6 +240,7 @@
         weights: Object.fromEntries(Object.keys(weights).map((k) => [k, 1])),
         packSize: parseDecimal(packSize),
         packUnit,
+        nutritionPer: perPiece ? 'piece' : undefined,
       },
       ownLines,
     ),
@@ -249,6 +252,8 @@
   let filledFrom = $state<BasicFood>();
 
   function useFood(food: BasicFood) {
+    // The table's values are per 100 g.
+    perPiece = false;
     for (const key of nutrientKeys) nutrition[key] = String(foodNutrition(food)[key]);
     // Weights already typed stay; the food only adds the ones missing.
     for (const [key, grams] of Object.entries(food.weights ?? {}))
@@ -330,6 +335,7 @@
       nutrition: cleanNutrition(
         Object.fromEntries(nutrientKeys.map((k) => [k, parseDecimal(nutrition[k])])),
       ),
+      nutritionPer: perPiece ? 'piece' : undefined,
       negligible: negligible || undefined,
       weights: cleanWeights(
         Object.fromEntries(Object.entries(weights).map(([k, v]) => [k, parseDecimal(v)])),
@@ -350,7 +356,7 @@
     }
     await store.saveProduct(product, photo);
     showToast(existing ? 'Product saved' : `${product.name} added`);
-    router.back('/more/products');
+    router.back('/products');
   }
 
   async function remove() {
@@ -362,7 +368,7 @@
     });
     if (!ok) return;
     await store.deleteProduct(base.id);
-    router.back('/more/products');
+    router.back('/products');
   }
 </script>
 
@@ -372,7 +378,7 @@
       class="icon-btn"
       type="button"
       aria-label="Cancel"
-      onclick={() => router.back('/more/products')}
+      onclick={() => router.back('/products')}
     >
       <X size={22} />
     </button>
@@ -618,8 +624,9 @@
       <div>
         <span class="switch-title">Nutrition</span>
         <span class="hint"
-          >Per 100 {packUnit === 'ml' ? 'ml' : 'g'}, as on the label. Recipes use it for calories
-          per portion.</span
+          >{perPiece
+            ? 'Per piece, for things recipes count, like “2 stock cubes”.'
+            : `Per ${per100Label}, as on the label.`} Recipes use it for calories per portion.</span
         >
       </div>
       <label class="switch">
@@ -656,6 +663,14 @@
             </button>
           </div>
         </div>
+        <div class="segmented" role="group" aria-label="Nutrition is given">
+          <button type="button" aria-pressed={!perPiece} onclick={() => (perPiece = false)}
+            >Per {per100Label}</button
+          >
+          <button type="button" aria-pressed={perPiece} onclick={() => (perPiece = true)}
+            >Per piece</button
+          >
+        </div>
         <div class="nutrients">
           {#each nutrientKeys as key (key)}
             <label class="field">
@@ -666,7 +681,7 @@
                   inputmode="decimal"
                   bind:value={nutrition[key]}
                   placeholder="0"
-                  aria-label={`${nutrientLabels[key]} per 100 ${packUnit === 'ml' ? 'ml' : 'g'}`}
+                  aria-label={`${nutrientLabels[key]} per ${perPiece ? 'piece' : per100Label}`}
                 />
                 <span class="suffix">{nutrientUnits[key]}</span>
               </span>
@@ -717,8 +732,8 @@
               <li class="way-row">
                 <a
                   class="row"
-                  href={`#/more/products/${source.id}`}
-                  onclick={(e) => (e.preventDefault(), router.go(`/more/products/${source.id}`))}
+                  href={`#/products/${source.id}`}
+                  onclick={(e) => (e.preventDefault(), router.go(`/products/${source.id}`))}
                 >
                   <ProductPhoto url={source.imageUrl} photoId={source.photoId} size={36} />
                   <span class="row-main">

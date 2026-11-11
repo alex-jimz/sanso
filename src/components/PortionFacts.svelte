@@ -66,8 +66,8 @@
     }
     open = false;
     if (facts.missing.every((m) => m.kind === 'amount')) router.go(`/recipes/${recipe.id}/edit`);
-    else if (facts.product) router.go(`/more/products/${facts.product.id}`);
-    else router.go(`/more/products/new?name=${encodeURIComponent(capitalize(facts.line.name))}`);
+    else if (facts.product) router.go(`/products/${facts.product.id}`);
+    else router.go(`/products/new?name=${encodeURIComponent(capitalize(facts.line.name))}`);
   }
 
   function summary(): string {

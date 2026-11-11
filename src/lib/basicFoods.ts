@@ -97,7 +97,7 @@ export function isEmptyFill(fill: FoodFill): boolean {
 }
 
 /** The product with a fill applied. */
-export function applyFill<T extends Pick<Product, 'nutrition' | 'weights'>>(
+export function applyFill<T extends Pick<Product, 'nutrition' | 'nutritionPer' | 'weights'>>(
   product: T,
   fill: FoodFill,
 ): T {
@@ -105,6 +105,8 @@ export function applyFill<T extends Pick<Product, 'nutrition' | 'weights'>>(
   return {
     ...product,
     nutrition: fill.nutrition ?? product.nutrition,
+    // The table's values are per 100 g.
+    nutritionPer: fill.nutrition ? undefined : product.nutritionPer,
     weights: Object.keys(weights).length ? weights : undefined,
   };
 }

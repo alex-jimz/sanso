@@ -102,7 +102,7 @@
       saving = false;
     }
     showToast(count === 1 ? 'Filled in 1 product' : `Filled in ${count} products`);
-    router.back('/more/products');
+    router.back('/products');
   }
 </script>
 
@@ -112,7 +112,7 @@
       class="icon-btn"
       type="button"
       aria-label="Close"
-      onclick={() => router.back('/more/products')}
+      onclick={() => router.back('/products')}
     >
       <X size={22} />
     </button>
