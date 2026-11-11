@@ -17,6 +17,8 @@ export interface Option {
   product?: Product;
   /** True when the product matched by name or alias, not just by the words in its name. */
   exact: boolean;
+  /** The usual pick for this name, used by recipes that haven't picked one. */
+  usual?: boolean;
 }
 
 export interface HeadingRow {
@@ -101,7 +103,7 @@ export function optionKey(product: Product | undefined, normalized: string): str
 }
 
 /** Most products offered for one alternative, so a common word can't flood the list. */
-const maxProducts = 4;
+const maxProducts = 8;
 
 export function ingredientRows(
   ingredients: string[],
@@ -126,8 +128,8 @@ export function ingredientRows(
       const matches = resolve(normalized).slice(0, maxProducts);
       if (!matches.length)
         options.push({ key: optionKey(undefined, normalized), line, exact: false });
-      for (const { product, exact } of matches)
-        options.push({ key: optionKey(product, normalized), line, product, exact });
+      for (const { product, exact, usual } of matches)
+        options.push({ key: optionKey(product, normalized), line, product, exact, usual });
     }
     const unique = options.filter((o, i) => options.findIndex((p) => p.key === o.key) === i);
     const chosen = unique.find((o) => choices.includes(o.key)) ?? unique[0]!;
@@ -140,11 +142,19 @@ export function hasOptions(row: Row): row is IngredientRow {
   return !row.heading && row.options.length > 1;
 }
 
-/** The choices with one row's pick changed. Rows without options aren't stored. */
+/**
+ * The choices with one row's pick changed. Every row's current pick is kept,
+ * so linking more products to a name later doesn't change a recipe that was
+ * already set up. Rows with neither a product nor options aren't stored.
+ */
 export function withChoice(rows: Row[], row: IngredientRow, key: string): string[] {
   const id = (r: IngredientRow) => r.options.map((o) => o.key).join('|');
   const target = id(row);
-  return rows.filter(hasOptions).map((r) => (id(r) === target ? key : r.chosen.key));
+  const keys = rows
+    .filter((r): r is IngredientRow => !r.heading)
+    .filter((r) => id(r) === target || r.options.length > 1 || !!r.chosen.product)
+    .map((r) => (id(r) === target ? key : r.chosen.key));
+  return [...new Set(keys)];
 }
 
 /** The lines as they'll be cooked: headings, and the picked alternative of each ingredient. */

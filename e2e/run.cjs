@@ -363,11 +363,23 @@ async function portionFacts(page) {
   );
   await shot(page, '11c What is missing');
 
-  await page.getByRole('button', { name: /3 garlic cloves/ }).click();
-  await page.getByRole('heading', { name: 'New product' }).waitFor();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /3 garlic cloves/ })
+    .click();
+  const picker = page.getByRole('dialog', { name: '3 garlic cloves' });
+  await picker.getByText('None of your products matches “garlic” yet.').waitFor();
+  check(true, 'tapping an unlinked ingredient opens its product picker');
+  await picker.getByRole('button', { name: 'Pick a product or make one' }).click();
+  check(
+    (await picker.getByRole('searchbox').inputValue()) === 'Garlic',
+    'the search starts with the ingredient’s name',
+  );
+  await picker.getByRole('button', { name: 'New product “Garlic”' }).click();
+  await page.getByRole('heading', { name: 'Product', exact: true }).waitFor();
   check(
     (await page.getByPlaceholder('Basmati rice').inputValue()) === 'Garlic',
-    'tapping an unlinked ingredient starts a product with its name',
+    'making a product opens it, named after the ingredient',
   );
   check(
     (await page.locator('.weight-row').innerText()).includes('1 clove'),
@@ -1044,7 +1056,7 @@ async function ingredientOptions(browser, github) {
     'the picker shows each option’s calories and cost per portion',
   );
   await shot(page, '22 Choose an ingredient');
-  await sheet.getByRole('button', { name: /600 g chicken breast/ }).click();
+  await sheet.getByRole('button', { name: /^Chicken breast/ }).click();
   await sheet.waitFor({ state: 'detached' });
   facts = await page.locator('.facts').innerText();
   check(
@@ -1113,8 +1125,8 @@ async function ingredientOptions(browser, github) {
   const meal = page.getByRole('dialog', { name: 'Today · Dinner' });
   await meal.getByText('Ingredients for this meal').waitFor();
   await meal.getByRole('button', { name: /g chicken breast/ }).click();
-  const picker = page.getByRole('dialog', { name: 'Choose an ingredient' });
-  await picker.getByRole('button', { name: /g chicken thighs/ }).click();
+  const picker = page.getByRole('dialog', { name: /g chicken breast/ });
+  await picker.getByRole('button', { name: /^Chicken thighs/ }).click();
   await picker.waitFor({ state: 'detached' });
   check(
     (await meal.innerText()).includes('300 g chicken thighs'),
@@ -1478,6 +1490,164 @@ async function basicFoodsFill(browser, github) {
 }
 
 /** A fresh Pixel-sized browser profile: its own storage, as on another phone. */
+/** Picking an ingredient's product on the recipe page, and the red and yellow signs, on a fresh phone. */
+async function ingredientMatching(browser, github) {
+  const page = await newPhone(browser, github);
+  await page.goto(BASE);
+  await page.getByRole('heading', { name: 'Your recipe book is empty' }).waitFor();
+  await page.evaluate(async () => {
+    const now = new Date().toISOString();
+    const full = { kcal: 350, protein: 8, fat: 1, carbs: 77 };
+    const product = (id, name, extra = {}) => ({
+      id,
+      name,
+      shop: 'aldi',
+      listMode: 'auto',
+      aliases: [],
+      createdAt: now,
+      updatedAt: now,
+      ...extra,
+    });
+    const priced = { packSize: 1000, packUnit: 'g', price: 2, nutrition: full };
+    const recipe = (id, title, ingredients) => ({
+      id,
+      title,
+      tags: ['Meal'],
+      portions: 2,
+      ingredients,
+      steps: ['Cook everything.'],
+      notes: '',
+      createdAt: now,
+      updatedAt: now,
+    });
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('sanso', 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['recipes', 'products'], 'readwrite');
+      tx.objectStore('recipes').put(
+        recipe('risotto', 'Carrot risotto', ['300 g rice', '2 carrots', '1 tsp saffron']),
+      );
+      tx.objectStore('recipes').put(recipe('pilaf', 'Pilaf', ['300 g rice']));
+      for (const p of [
+        product('carrots', 'Carrots', {
+          ...priced,
+          nutrition: { kcal: 41, protein: 1, fat: 0.2, carbs: 7 },
+          weights: { piece: 60 },
+        }),
+        product('small', 'Small carrots', priced),
+        product('organic', 'Organic carrots', priced),
+        product('basmati', 'Basmati rice', priced),
+        product('brown', 'Brown rice', { nutrition: full }),
+        product('arborio', 'Arborio', priced),
+      ])
+        tx.objectStore('products').put(p);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  });
+  await page.reload();
+  await page.locator('.recipe').first().waitFor();
+
+  await page.goto(`${BASE}#/recipes/risotto`);
+  await page.getByRole('heading', { name: 'Carrot risotto' }).waitFor();
+  const lines = page.locator('.ingredients li');
+  const rice = lines.nth(0);
+  const carrots = lines.nth(1);
+  const saffron = lines.nth(2);
+  check(
+    (await carrots.innerText()).includes('Carrots · 3 options') &&
+      (await carrots.locator('.status').count()) === 0,
+    'carrots match all three carrot products, and need nothing',
+  );
+  check(
+    (await saffron.locator('.status.unlinked').count()) === 1 &&
+      (await saffron.innerText()).includes('No product yet'),
+    'an ingredient with no product gets the red sign',
+  );
+  check(
+    (await page.locator('.signs-key').innerText()).includes('Product missing info'),
+    'a key under the ingredients explains the signs',
+  );
+  await page.locator('.signs-key').scrollIntoViewIfNeeded();
+  await shot(page, '30 Ingredient signs');
+
+  await carrots.getByRole('button').click();
+  const sheet = page.getByRole('dialog');
+  await sheet.waitFor();
+  const offered = await sheet.locator('.row-title').allInnerTexts();
+  check(
+    ['Carrots', 'Small carrots', 'Organic carrots'].every((n) => offered.includes(n)) &&
+      offered[0] === 'Carrots',
+    `the sheet offers every carrot product, Carrots first (${offered.join(', ')})`,
+  );
+  await page.goBack();
+  await sheet.waitFor({ state: 'detached' });
+
+  // Rice: two products match by name; Arborio is picked from the whole list.
+  await rice.getByRole('button').click();
+  await sheet.waitFor();
+  check(
+    (await sheet.locator('.row-title').allInnerTexts()).join('|') === 'Basmati rice|Brown rice',
+    'rice offers both rice products',
+  );
+  await shot(page, '31 Pick a product');
+  await sheet.getByRole('button', { name: 'Pick another product' }).click();
+  const search = sheet.getByRole('searchbox');
+  check((await search.inputValue()) === 'Rice', 'the search starts with “Rice”');
+  await search.fill('arb');
+  await shot(page, '32 Search products');
+  await sheet.getByRole('button', { name: /^Arborio/ }).click();
+  check(
+    await seeToast(page, 'Arborio is now the usual pick for “rice”'),
+    'a product picked from the whole list is linked, and becomes the usual pick',
+  );
+  await sheet.waitFor({ state: 'detached' });
+  check(
+    (await rice.innerText()).includes('Arborio · 3 options'),
+    'the recipe uses Arborio, and offers it with the other two',
+  );
+
+  // Another recipe starts with the usual pick; picking Brown rice there shows the yellow sign.
+  await page.goto(`${BASE}#/recipes/pilaf`);
+  await page.getByRole('heading', { name: 'Pilaf' }).waitFor();
+  const pilafRice = page.locator('.ingredients li').nth(0);
+  check((await pilafRice.innerText()).includes('Arborio'), 'another recipe starts with Arborio');
+  await pilafRice.getByRole('button').click();
+  await sheet.waitFor();
+  await sheet.getByRole('button', { name: /^Brown rice/ }).click();
+  await sheet.waitFor({ state: 'detached' });
+  check(
+    (await pilafRice.locator('.status.incomplete').count()) === 1 &&
+      (await pilafRice.innerText()).includes('needs price'),
+    'a product missing its price gets the yellow sign',
+  );
+  await pilafRice.getByRole('button').click();
+  await sheet.waitFor();
+  check(
+    (await sheet.innerText()).includes('Fill in Brown rice'),
+    'the sheet offers to fill in the missing price',
+  );
+  await sheet.getByRole('button', { name: /Use Brown rice for “rice”/ }).click();
+  check(
+    await seeToast(page, 'Brown rice is now the usual pick for “rice”'),
+    'a pick can become the usual one',
+  );
+  await page.goBack();
+  await sheet.waitFor({ state: 'detached' });
+  await page.goto(`${BASE}#/recipes/risotto`);
+  await page.getByRole('heading', { name: 'Carrot risotto' }).waitFor();
+  check(
+    (await page.locator('.ingredients li').nth(0).innerText()).includes('Arborio'),
+    'the risotto keeps its own pick',
+  );
+  await collectCsp(page);
+  await page.context().close();
+}
+
 async function newPhone(browser, github, options = {}) {
   const context = await browser.newContext({
     ...devices['Pixel 7'],
@@ -1525,6 +1695,7 @@ async function main() {
     await ingredientOptions(browser, github);
     await offersPrices(browser, github);
     await basicFoodsFill(browser, github);
+    await ingredientMatching(browser, github);
   } catch (error) {
     problems.push(`stopped: ${error.message.split('\n')[0]}`);
     for (const context of browser.contexts()) for (const p of context.pages()) current = p;

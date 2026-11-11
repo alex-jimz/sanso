@@ -73,7 +73,7 @@
     if (!item) return;
     const names = ingredientNames();
     if (item.manual) await store.updateItem(item.id, { productId: target.id, name: target.name });
-    for (const name of names) await store.linkName(target.id, name);
+    for (const name of names) await store.linkName(target.id, name, { usual: true });
     open = false;
   }
 
