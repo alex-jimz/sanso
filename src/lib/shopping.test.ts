@@ -159,11 +159,12 @@ describe('packs and prices', () => {
     expect(packsNeeded(amounts(0), rice)).toBeUndefined();
   });
 
-  it('uses offer prices until the offer ends', () => {
-    const onOffer = { ...rice, offer: { price: 1.49, until: '2026-10-25' } };
+  it('uses offer prices only in the offer week', () => {
+    const onOffer = { ...rice, offers: [{ price: 1.49, from: '2026-10-23', until: '2026-10-29' }] };
     const item = { amounts: amounts(1200) } as Parameters<typeof itemCost>[0];
+    expect(itemCost(item, onOffer, '2026-10-22').total).toBeCloseTo(3.78);
     expect(itemCost(item, onOffer, '2026-10-24').total).toBeCloseTo(2.98);
-    expect(itemCost(item, onOffer, '2026-10-26').total).toBeCloseTo(3.78);
+    expect(itemCost(item, onOffer, '2026-10-30').total).toBeCloseTo(3.78);
   });
 
   it('works out the price per kg', () => {

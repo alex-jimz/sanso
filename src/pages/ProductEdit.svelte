@@ -12,9 +12,10 @@
   import ProductPickerSheet from '../components/ProductPickerSheet.svelte';
   import SectionPicker from '../components/SectionPicker.svelte';
   import ProductPhoto from '../components/ProductPhoto.svelte';
+  import PriceHistory from '../components/PriceHistory.svelte';
   import { cleanBreakdown, isShopProduct } from '../lib/breakdown';
   import { readClipboardImage, resizePhoto } from '../lib/photos';
-  import { addDays, formatDayMonth, todayISO } from '../lib/dates';
+  import { formatDayMonth, formatWeekday, todayISO } from '../lib/dates';
   import { normalizeName } from '../lib/ingredients';
   import { wordMatch } from '../lib/matching';
   import {
@@ -26,11 +27,13 @@
     weightLabel,
     weightsNeeded,
   } from '../lib/nutrition';
+  import { formatOfferWeek, offerWeeks, upcomingOffers, weekOffer, withOffer } from '../lib/offers';
+  import { logPrice } from '../lib/priceHistory';
   import { formatPrice } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
   import { unitPrice } from '../lib/shopping';
   import { store } from '../lib/store.svelte';
-  import type { BreakdownPart, ListMode, PackUnit, Product, Shop } from '../lib/types';
+  import type { BreakdownPart, ListMode, Offer, PackUnit, Product, Shop } from '../lib/types';
   import { askConfirm, showToast, ui } from '../lib/ui.svelte';
   import { parseDecimal, safeUrl } from '../lib/util';
 
@@ -76,11 +79,41 @@
   let listMode = $state<ListMode>(base.listMode);
   let aliases = $state([...base.aliases]);
   let notFor = $state([...(base.notFor ?? [])]);
-  let onOffer = $state(!!base.offer && base.offer.until >= today);
-  let offerPrice = $state(base.offer?.price.toFixed(2) ?? '');
-  let offerUntil = $state(
-    base.offer && base.offer.until >= today ? base.offer.until : addDays(today, 6),
-  );
+  // Offers that have ended stay as they are, for the price graph. The form edits the rest.
+  const pastOffers = (base.offers ?? []).filter((o) => o.until < today);
+  let offers = $state<Offer[]>(upcomingOffers(base.offers, today));
+  const weeks = offerWeeks(today);
+  let addingOffer = $state(false);
+  let offerPrice = $state('');
+  let offerWeek = $state(weeks[0]!.from);
+  const chosenWeek = $derived(weeks.find((w) => w.from === offerWeek) ?? weeks[0]!);
+
+  function startOffer() {
+    // Start on the first week that has no offer yet.
+    offerWeek = (weeks.find((w) => !offers.some((o) => o.from === w.from)) ?? weeks[0]!).from;
+    offerPrice = '';
+    addingOffer = true;
+  }
+
+  /** The offers to save, with one being typed in if it has a price. */
+  function offersWithDraft(): Offer[] {
+    const draft = addingOffer ? parseDecimal(offerPrice) : undefined;
+    return draft === undefined ? offers : withOffer(offers, weekOffer(draft, offerWeek));
+  }
+
+  function addOffer() {
+    if (parseDecimal(offerPrice) === undefined) {
+      showToast('Type the offer price first.');
+      return;
+    }
+    offers = offersWithDraft();
+    addingOffer = false;
+  }
+
+  function offerLabel(offer: Offer): string {
+    if (offer.from <= today) return 'On now';
+    return weeks.find((w) => w.from === offer.from)?.label ?? '';
+  }
   let nutrition = $state<Record<string, string>>(
     Object.fromEntries(nutrientKeys.map((k) => [k, base.nutrition?.[k]?.toString() ?? ''])),
   );
@@ -237,14 +270,24 @@
   );
   const link = $derived(safeUrl(url));
 
+  // The price graph follows the form as it's edited, before saving.
+  const preview = $derived.by(() => {
+    const draft: Product = {
+      ...base,
+      price: parseDecimal(price),
+      offers: [...pastOffers, ...offers],
+    };
+    return { ...draft, priceLog: logPrice(existing ? base : undefined, draft, today) };
+  });
+
   async function save() {
     if (!name.trim()) {
       showToast('Give the product a name first.');
       return;
     }
     const size = parseDecimal(packSize);
-    const offer = parseDecimal(offerPrice);
     const newPrice = parseDecimal(price);
+    const allOffers = [...pastOffers, ...offersWithDraft()];
     const product: Product = {
       ...base,
       name: name.trim(),
@@ -259,7 +302,7 @@
       listMode,
       aliases,
       notFor,
-      offer: onOffer && offer !== undefined ? { price: offer, until: offerUntil } : undefined,
+      offers: allOffers.length ? allOffers : undefined,
       nutrition: cleanNutrition(
         Object.fromEntries(nutrientKeys.map((k) => [k, parseDecimal(nutrition[k])])),
       ),
@@ -459,35 +502,93 @@
       <span class="hint">{modes.find((m) => m.id === listMode)?.hint}</span>
     </div>
 
-    <div class="card card-pad stack offer-card" class:on={onOffer}>
-      <label class="switch">
-        <span>
-          <span class="switch-title"><Tag size={17} /> On offer</span>
-          <span class="hint">Shopping lists highlight it until the offer ends.</span>
-        </span>
-        <input type="checkbox" role="switch" bind:checked={onOffer} />
-      </label>
-      {#if onOffer}
-        <div class="input-row">
-          <label class="field">
-            <span class="field-label">Offer price</span>
-            <span class="with-unit">
-              <span class="euro">€</span>
-              <input
-                class="input money"
-                inputmode="decimal"
-                bind:value={offerPrice}
-                placeholder="1.49"
-              />
-            </span>
-          </label>
-          <label class="field">
-            <span class="field-label">Until</span>
-            <input class="input" type="date" bind:value={offerUntil} min={today} />
-          </label>
+    <div class="card card-pad stack offer-card" class:on={offers.length > 0}>
+      <div>
+        <span class="switch-title"><Tag size={17} /> Offers</span>
+        <span class="hint"
+          >Offers run Thursday to Wednesday. Shopping lists use the offer price that week.</span
+        >
+      </div>
+      {#if offers.length}
+        <ul class="offers">
+          {#each offers as offer (offer.from)}
+            <li class="offer-row">
+              <span class="offer-price">{formatPrice(offer.price)}</span>
+              <span class="offer-week">
+                {formatOfferWeek(offer)}
+                {#if offerLabel(offer)}<span class="hint">{offerLabel(offer)}</span>{/if}
+              </span>
+              <button
+                class="icon-btn"
+                type="button"
+                aria-label={`Remove the offer for ${formatOfferWeek(offer)}`}
+                onclick={() => (offers = offers.filter((o) => o.from !== offer.from))}
+              >
+                <X size={18} />
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      {#if addingOffer}
+        <label class="field">
+          <span class="field-label">Offer price</span>
+          <span class="with-unit">
+            <span class="euro">€</span>
+            <input
+              class="input money"
+              inputmode="decimal"
+              bind:value={offerPrice}
+              placeholder="1.49"
+            />
+          </span>
+        </label>
+        <div class="field">
+          <span class="field-label">Starts on</span>
+          <div class="weeks">
+            {#each weeks as week (week.from)}
+              <button
+                class="week"
+                type="button"
+                aria-pressed={offerWeek === week.from}
+                onclick={() => (offerWeek = week.from)}
+              >
+                <span class="week-day"
+                  >{formatWeekday(week.from, true)} {formatDayMonth(week.from)}</span
+                >
+                <span class="week-label">{week.label}</span>
+              </button>
+            {/each}
+          </div>
+          <span class="hint"
+            >Ends {formatWeekday(chosenWeek.until)}
+            {formatDayMonth(chosenWeek.until)}{offers.some(
+              (o) => o.from <= chosenWeek.until && o.until >= chosenWeek.from,
+            )
+              ? ', replacing the offer already set for that week.'
+              : '.'}</span
+          >
         </div>
+        <div class="offer-actions">
+          <button class="btn btn-small btn-primary" type="button" onclick={addOffer}
+            ><Check size={16} /> Add offer</button
+          >
+          <button
+            class="btn btn-small btn-quiet"
+            type="button"
+            onclick={() => (addingOffer = false)}>Cancel</button
+          >
+        </div>
+      {:else}
+        <button class="btn btn-small btn-outline" type="button" onclick={startOffer}
+          ><Plus size={16} /> Add an offer</button
+        >
       {/if}
     </div>
+
+    {#if existing && (preview.price !== undefined || preview.offers?.length)}
+      <PriceHistory product={preview} {today} />
+    {/if}
 
     <div class="card card-pad stack">
       <div>
@@ -862,6 +963,73 @@
 
   .offer-card.on {
     box-shadow: inset 0 0 0 1.5px var(--tomato-soft);
+  }
+
+  .offers {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .offer-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .offer-price {
+    min-width: 3.6em;
+    color: var(--tomato);
+    font-weight: 700;
+  }
+
+  .offer-week {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .offer-week .hint {
+    display: block;
+  }
+
+  .weeks {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .week {
+    display: grid;
+    gap: 2px;
+    padding: 9px 6px;
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    text-align: center;
+  }
+
+  .week[aria-pressed='true'] {
+    border-color: var(--tomato);
+    background: var(--tomato-soft);
+  }
+
+  .week-day {
+    font-weight: 650;
+    font-size: 0.9375rem;
+  }
+
+  .week-label {
+    color: var(--muted);
+    font-size: 0.8125rem;
+  }
+
+  .offer-actions {
+    display: flex;
+    gap: 8px;
   }
 
   .switch {

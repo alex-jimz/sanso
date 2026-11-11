@@ -24,7 +24,9 @@ import { ingredientRows, type IngredientRow, type Option } from './choices';
 import { defaultSections, defaultSettings } from './defaults';
 import { capitalize, normalizeName } from './ingredients';
 import { cleanNutrition, cleanWeights, recipeFacts } from './nutrition';
+import { cleanOffers } from './offers';
 import { forgetPhotoUrls } from './photos';
+import { cleanPriceLog, logPrice } from './priceHistory';
 import type { ImportedRecipe } from './recipeFormat';
 import { emptyAmounts, formatAmounts } from './quantity';
 import { buildItems, mergeDecisions, productResolver, type Matcher } from './shopping';
@@ -74,8 +76,12 @@ export function cleanRecipe(raw: Recipe): Recipe {
 }
 
 export function cleanProduct(raw: Product): Product {
+  // `offer` is how older versions stored a single offer; cleanOffers converts it.
+  const { offer: _legacyOffer, ...rest } = raw as Product & { offer?: unknown };
   return {
-    ...raw,
+    ...rest,
+    offers: cleanOffers(raw as Product & { offer?: unknown }),
+    priceLog: cleanPriceLog(raw.priceLog),
     nutrition: cleanNutrition(raw.nutrition),
     negligible: raw.negligible === true ? true : undefined,
     weights: cleanWeights(raw.weights),
@@ -272,7 +278,9 @@ class Store {
   /** `photo`: a new Blob replaces the photo, null removes it, undefined keeps it. */
   async saveProduct(input: Product, photo?: Blob | null): Promise<Product> {
     const product = cleanProduct(plain(input));
-    const oldPhotoId = this.productById.get(product.id)?.photoId;
+    const previous = this.productById.get(product.id);
+    const oldPhotoId = previous?.photoId;
+    product.priceLog = logPrice(previous && plain(previous), product, todayISO());
     if (photo) product.photoId = newId();
     else if (photo === null) product.photoId = undefined;
     const ownName = normalizeName(product.name);

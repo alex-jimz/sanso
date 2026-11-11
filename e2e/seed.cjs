@@ -178,7 +178,7 @@ async function seed() {
     product('p-spaghetti', 'Spaghetti', 'grains', 500, 'g', 0.85),
     product('p-mince', 'Irish beef mince', 'meat', 500, 'g', 4.29, {
       aliases: ['beef mince'],
-      offer: { price: 3.49, until: iso(3) },
+      offer: { price: 3.49, until: iso(6) },
     }),
     product('p-oil', 'Olive oil', 'sauces', 500, 'ml', 5.49, { listMode: 'check' }),
     product('p-salt', 'Sea salt', 'sauces', undefined, undefined, undefined, {
