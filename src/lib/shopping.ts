@@ -5,6 +5,7 @@
 import { ingredientRows } from './choices';
 import { capitalize, isTapWater, normalizeName, scaleLine } from './ingredients';
 import type { Resolver } from './matching';
+import { activeOffer } from './offers';
 import { emptyAmounts } from './quantity';
 import type { Amounts, ItemPart, Meal, Product, Recipe, ShoppingItem } from './types';
 import { getUnit } from './units';
@@ -140,9 +141,7 @@ export function itemPacks(item: ShoppingItem, product: Product | undefined): num
   return (own ?? 0) + extra;
 }
 
-export function activeOffer(product: Product | undefined, today: string) {
-  return product?.offer && product.offer.until >= today ? product.offer : undefined;
-}
+export { activeOffer };
 
 /** Estimated cost of an item: packs times pack price, using the offer price when there is one. */
 export function itemCost(item: ShoppingItem, product: Product | undefined, today: string) {

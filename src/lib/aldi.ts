@@ -9,10 +9,10 @@
 // names below are read defensively, so a renamed field costs one detail
 // (such as the was-price) rather than the whole import.
 
-import { addDays } from './dates';
 import { packLabel } from './listView';
+import { activeOffer, offerWeekStart, weekOffer, withOffer } from './offers';
 import { aldiSku, parsePackSize, unitFactor, unitWords } from './share';
-import type { Offer, PackUnit, Product } from './types';
+import type { PackUnit, Product } from './types';
 
 export interface AldiItem {
   sku: string;
@@ -211,15 +211,11 @@ export function findProduct(products: Product[], item: AldiItem): Product | unde
   );
 }
 
-function sameOffer(a: Offer | undefined, b: Offer | undefined) {
-  return a?.price === b?.price && a?.until === b?.until;
-}
-
 /**
  * Applies what aldi.ie shows to a product. Prices and pack size come from Aldi;
  * the name, section and list settings stay as the user set them. A price drop
- * becomes an offer for a week, since Aldi doesn't say when it ends. Returns
- * the updated product and the changes worth showing.
+ * becomes an offer for this offer week (Thursday to Wednesday), since Aldi
+ * doesn't say when it ends. Returns the updated product and the changes worth showing.
  */
 export function applyAldi(
   product: Product,
@@ -248,12 +244,9 @@ export function applyAldi(
     next.price = regular;
   }
 
-  if (item.wasPrice && item.price) {
-    const current = product.offer && product.offer.until >= today ? product.offer : undefined;
-    const offer =
-      current?.price === item.price ? current : { price: item.price, until: addDays(today, 6) };
-    if (!sameOffer(offer, product.offer)) changes.push(`On offer at ${euro(item.price)}`);
-    next.offer = offer;
+  if (item.wasPrice && item.price && activeOffer(product, today)?.price !== item.price) {
+    changes.push(`On offer at ${euro(item.price)}`);
+    next.offers = withOffer(product.offers, weekOffer(item.price, offerWeekStart(today)));
   }
 
   if (
@@ -282,8 +275,8 @@ export function newProductFields(item: AldiItem, today: string): Partial<Product
     packSize: item.packSize,
     packUnit: item.packUnit,
     price: item.wasPrice ?? item.price,
-    offer:
-      item.wasPrice && item.price ? { price: item.price, until: addDays(today, 6) } : undefined,
+    offers:
+      item.wasPrice && item.price ? [weekOffer(item.price, offerWeekStart(today))] : undefined,
     priceCheckedAt: today,
   };
 }

@@ -205,7 +205,9 @@ describe('findProduct', () => {
 });
 
 describe('applyAldi', () => {
+  // A Friday: the offer week runs from Thursday 5 to Wednesday 11 November.
   const today = '2026-11-06';
+  const thisWeek = { from: '2026-11-05', until: '2026-11-11' };
 
   it('updates price and pack size and keeps what the user set', () => {
     const [item] = parseAldiPayload(payload([penne])).items;
@@ -225,11 +227,11 @@ describe('applyAldi', () => {
     });
   });
 
-  it('turns a price drop into an offer for a week, with the old price as the price', () => {
+  it('turns a price drop into an offer for this offer week, with the old price as the price', () => {
     const [item] = parseAldiPayload(payload([mince])).items;
     const { product: after, changes } = applyAldi(product({ price: 5.29 }), item!, today);
     expect(after.price).toBe(5.29);
-    expect(after.offer).toEqual({ price: 4.49, until: '2026-11-12' });
+    expect(after.offers).toEqual([{ price: 4.49, ...thisWeek }]);
     expect(changes).toContain('On offer at €4.49');
   });
 
@@ -239,11 +241,24 @@ describe('applyAldi', () => {
       price: 5.29,
       packSize: 500,
       packUnit: 'g',
-      offer: { price: 4.49, until: '2026-11-08' },
+      offers: [{ price: 4.49, from: '2026-11-02', until: '2026-11-08' }],
     });
     const { product: after, changes } = applyAldi(known, item!, today);
-    expect(after.offer).toEqual({ price: 4.49, until: '2026-11-08' });
+    expect(after.offers).toEqual(known.offers);
     expect(changes).toEqual([]);
+  });
+
+  it('replaces this week’s offer at another price, and keeps past and later ones', () => {
+    const [item] = parseAldiPayload(payload([mince])).items;
+    const past = { price: 3.99, from: '2026-10-22', until: '2026-10-28' };
+    const later = { price: 3.49, from: '2026-11-12', until: '2026-11-18' };
+    const known = product({
+      price: 5.29,
+      offers: [past, { price: 4.99, ...thisWeek }, later],
+    });
+    const { product: after, changes } = applyAldi(known, item!, today);
+    expect(after.offers).toEqual([past, { price: 4.49, ...thisWeek }, later]);
+    expect(changes).toContain('On offer at €4.49');
   });
 
   it('makes new products with the regular price and any offer', () => {
@@ -251,7 +266,7 @@ describe('applyAldi', () => {
     expect(newProductFields(item!, today)).toMatchObject({
       shop: 'aldi',
       price: 5.29,
-      offer: { price: 4.49, until: '2026-11-12' },
+      offers: [{ price: 4.49, ...thisWeek }],
       packSize: 500,
     });
   });

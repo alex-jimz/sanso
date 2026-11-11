@@ -1144,6 +1144,194 @@ async function ingredientOptions(browser, github) {
   await page.context().close();
 }
 
+/** Offer weeks, the next-week filter, the price graph and the missing-info filter, on a fresh phone. */
+async function offersPrices(browser, github) {
+  const page = await newPhone(browser, github);
+  await page.goto(BASE);
+  await page.getByRole('heading', { name: 'Your recipe book is empty' }).waitFor();
+  await page.evaluate(async () => {
+    const iso = (offset) => {
+      const d = new Date();
+      d.setHours(12, 0, 0, 0);
+      d.setDate(d.getDate() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const created = new Date(Date.now() - 90 * 86400000).toISOString();
+    const nutrition = { kcal: 100, protein: 5, fat: 2, carbs: 10 };
+    const product = (id, name, extra) => ({
+      id,
+      name,
+      shop: 'aldi',
+      sectionId: 'grains',
+      listMode: 'auto',
+      aliases: [],
+      createdAt: created,
+      updatedAt: created,
+      ...extra,
+    });
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('sanso', 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['recipes', 'products'], 'readwrite');
+      tx.objectStore('recipes').put({
+        id: 'stew',
+        title: 'Beef stew',
+        tags: [],
+        portions: 2,
+        ingredients: ['500 g irish beef mince', '3 garlic cloves', '1 onion'],
+        steps: ['Cook.'],
+        notes: '',
+        createdAt: created,
+        updatedAt: created,
+      });
+      for (const p of [
+        // Saved by an older version: one offer with only an end date, set today for 7 days.
+        product('mince', 'Irish beef mince', {
+          packSize: 500,
+          packUnit: 'g',
+          price: 4.29,
+          nutrition,
+          offer: { price: 3.49, until: iso(6) },
+          priceLog: [
+            { date: iso(-80), price: 3.99 },
+            { date: iso(-30), price: 4.29 },
+          ],
+          offers: undefined,
+        }),
+        product('rice', 'Basmati rice', { packSize: 1000, packUnit: 'g', price: 1.89, nutrition }),
+        product('garlic', 'Garlic', { packSize: 250, packUnit: 'g', price: 0.69 }),
+        product('onion', 'Onion', {}),
+        product('salt', 'Sea salt', { negligible: true, listMode: 'skip', sectionId: undefined }),
+      ])
+        tx.objectStore('products').put(p);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  });
+  await page.goto(`${BASE}#/more/products`);
+  await page.reload();
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+  const chip = (name) => page.locator('.tools .chip', { hasText: new RegExp(`^${name}`) });
+  const rowNames = async () =>
+    (await page.locator('.row .row-title').allInnerTexts()).map((t) => t.trim());
+
+  // An offer saved by an older version still counts, as a 7-day offer.
+  await chip('On offer now').click();
+  check(
+    JSON.stringify(await rowNames()) === '["Irish beef mince"]' &&
+      (await page.locator('.row .pill.offer').first().innerText()).includes('€3.49'),
+    'an offer saved by the old version shows under On offer now',
+  );
+
+  // Adding an offer: pick the Thursday it starts, and the end is set.
+  await page.goto(`${BASE}#/more/products/rice`);
+  await page.getByRole('button', { name: 'Add an offer' }).click();
+  await page.getByPlaceholder('1.49').fill('1.49');
+  const weeks = page.locator('.weeks .week');
+  check((await weeks.count()) === 3, 'an offer can start this week or in the next two');
+  const nextWeek = page.locator('.weeks .week', { hasText: 'Next week' });
+  await nextWeek.click();
+  const nextThu = (await nextWeek.locator('.week-day').innerText()).trim();
+  const ends = await page.locator('.offer-card .field .hint').innerText();
+  check(
+    /^Thu \d+ \w{3}$/.test(nextThu) && /^Ends Wednesday \d+ \w{3}\.$/.test(ends.trim()),
+    `the offer starts on a Thursday and ends on the Wednesday after (${nextThu}, ${ends.trim()})`,
+  );
+  await shot(page, '24 Adding an offer');
+  await page.getByRole('button', { name: 'Add offer' }).click();
+  const offerRow = page.locator('.offer-row');
+  check(
+    (await offerRow.count()) === 1 && (await offerRow.innerText()).includes('Next week'),
+    'the offer is listed as next week’s',
+  );
+  // The regular price goes up too.
+  await page.getByPlaceholder('1.89').fill('1.99');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+
+  await chip('On offer next week').click();
+  let names = await rowNames();
+  check(
+    names.includes('Basmati rice') &&
+      (await page.locator('.row', { hasText: 'Basmati rice' }).innerText()).includes(
+        'Next week €1.49',
+      ),
+    'On offer next week lists the rice with its offer price',
+  );
+  await chip('On offer now').click();
+  check(!(await rowNames()).includes('Basmati rice'), 'next week’s offer isn’t on now');
+
+  // The price graph: the rice went up today and has next week's offer ahead.
+  await page.goto(`${BASE}#/more/products/rice`);
+  const history = page.locator('.card', { hasText: 'Price history' });
+  await history.waitFor();
+  let historyText = await history.innerText();
+  check(
+    historyText.includes('Up to €1.99') &&
+      historyText.includes('from €1.89') &&
+      historyText.includes('Offer €1.49') &&
+      historyText.includes('usually €1.99'),
+    'the price history lists the price rise and the coming offer',
+  );
+  check(
+    (await history.locator('path.price').count()) >= 1 &&
+      (await history.locator('path.dip.future').count()) === 1,
+    'the graph draws the price, with the coming offer as a faded dip',
+  );
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+  await page.goto(`${BASE}#/more/products/mince`);
+  await history.waitFor();
+  historyText = await history.innerText();
+  check(
+    historyText.includes('Up to €4.29') && historyText.includes('Offer €3.49'),
+    'the mince graph shows its earlier rise and the offer on now',
+  );
+  check(
+    (await page.locator('.offer-row').innerText()).includes('On now'),
+    'the old offer can be edited as an offer on now',
+  );
+  await history.scrollIntoViewIfNeeded();
+  await shot(page, '25 Price history');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+
+  // Missing info, with a chip for each kind of detail.
+  await chip('Missing info').click();
+  names = await rowNames();
+  check(
+    !names.includes('Sea salt') && names.includes('Onion') && names.includes('Garlic'),
+    'Missing info leaves out salt, which needs nothing',
+  );
+  const missingChip = (name) => page.locator('.missing-chips .chip', { hasText: name });
+  await missingChip('Nutrition').click();
+  check(
+    JSON.stringify((await rowNames()).sort()) === '["Garlic","Onion"]',
+    'the Nutrition chip shows only products without nutrition',
+  );
+  await missingChip('Weights').click();
+  check(
+    JSON.stringify((await rowNames()).sort()) === '["Garlic","Onion"]',
+    'the Weights chip shows products whose recipe lines need a weight',
+  );
+  await missingChip('Price').click();
+  check(JSON.stringify(await rowNames()) === '["Onion"]', 'the Price chip shows the onion');
+  check(
+    (await page.locator('.row', { hasText: 'Onion' }).innerText()).includes(
+      'No price, pack size, nutrition, weights, photo',
+    ),
+    'each row says what it’s missing',
+  );
+  await missingChip('Anything').click();
+  await shot(page, '26 Missing info');
+  await collectCsp(page);
+  await page.context().close();
+}
+
 /** A fresh Pixel-sized browser profile: its own storage, as on another phone. */
 async function newPhone(browser, github, options = {}) {
   const context = await browser.newContext({
@@ -1190,6 +1378,7 @@ async function main() {
     await backups(browser, github);
     await breakdown(browser, github);
     await ingredientOptions(browser, github);
+    await offersPrices(browser, github);
   } catch (error) {
     problems.push(`stopped: ${error.message.split('\n')[0]}`);
     for (const context of browser.contexts()) for (const p of context.pages()) current = p;

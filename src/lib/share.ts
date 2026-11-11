@@ -10,7 +10,7 @@ export type SharedProduct = Pick<Product, 'name' | 'shop'> &
   Partial<
     Pick<
       Product,
-      'url' | 'sku' | 'imageUrl' | 'packSize' | 'packUnit' | 'price' | 'offer' | 'priceCheckedAt'
+      'url' | 'sku' | 'imageUrl' | 'packSize' | 'packUnit' | 'price' | 'offers' | 'priceCheckedAt'
     >
   >;
 

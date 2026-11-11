@@ -8,31 +8,69 @@
   import { todayISO } from '../lib/dates';
   import { normalizeName } from '../lib/ingredients';
   import { packLabel } from '../lib/listView';
+  import {
+    linesByProduct,
+    missingInfo,
+    missingKinds,
+    missingLabels,
+    type MissingKind,
+  } from '../lib/missingInfo';
+  import { activeOffer, nextWeekOffer } from '../lib/offers';
   import { formatPrice } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
-  import { activeOffer, unitPrice } from '../lib/shopping';
+  import { unitPrice } from '../lib/shopping';
   import { store } from '../lib/store.svelte';
   import type { Product, Section } from '../lib/types';
 
-  type Filter = 'all' | 'offer' | 'aldi' | 'lidl' | 'unsorted';
+  type Filter = 'all' | 'offer' | 'nextOffer' | 'aldi' | 'lidl' | 'missing';
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: 'All' },
-    { id: 'offer', label: 'On offer' },
+    { id: 'offer', label: 'On offer now' },
+    { id: 'nextOffer', label: 'On offer next week' },
+    { id: 'missing', label: 'Missing info' },
     { id: 'aldi', label: 'Aldi' },
     { id: 'lidl', label: 'Lidl' },
-    { id: 'unsorted', label: 'No section' },
   ];
 
   const today = todayISO();
   let query = $state('');
   let filter = $state<Filter>('all');
+  /** Which missing detail to show under "Missing info", or any. */
+  let missingKind = $state<MissingKind | 'any'>('any');
+
+  const recipeLines = $derived(linesByProduct(store.recipes, store.resolve));
+  const missing = $derived(
+    new Map(
+      store.products.map((p) => [
+        p.id,
+        missingInfo(p, {
+          hasSection: !!p.sectionId && store.sectionById.has(p.sectionId),
+          isPart: !!store.sources.get(p.id)?.length,
+          lines: recipeLines.get(p.id) ?? [],
+        }),
+      ]),
+    ),
+  );
+  const missingCounts = $derived(
+    missingKinds
+      .map((kind) => ({
+        kind,
+        count: store.products.filter((p) => missing.get(p.id)?.includes(kind)).length,
+      }))
+      .filter((k) => k.count > 0),
+  );
+  const missingAny = $derived(store.products.filter((p) => missing.get(p.id)?.length).length);
 
   const shown = $derived(
     store.products.filter((p) => {
       if (query.trim() && !normalizeName(p.name).includes(normalizeName(query))) return false;
       if (filter === 'offer') return !!activeOffer(p, today);
+      if (filter === 'nextOffer') return !!nextWeekOffer(p, today);
       if (filter === 'aldi' || filter === 'lidl') return p.shop === filter;
-      if (filter === 'unsorted') return !p.sectionId || !store.sectionById.has(p.sectionId);
+      if (filter === 'missing') {
+        const list = missing.get(p.id) ?? [];
+        return missingKind === 'any' ? list.length > 0 : list.includes(missingKind);
+      }
       return true;
     }),
   );
@@ -126,7 +164,34 @@
           </button>
         {/each}
       </div>
+      {#if filter === 'missing' && missingAny}
+        <div class="chips missing-chips" role="group" aria-label="Missing">
+          <button
+            class="chip small"
+            type="button"
+            aria-pressed={missingKind === 'any'}
+            onclick={() => (missingKind = 'any')}
+            >Anything <span class="count">{missingAny}</span></button
+          >
+          {#each missingCounts as { kind, count } (kind)}
+            <button
+              class="chip small"
+              type="button"
+              aria-pressed={missingKind === kind}
+              onclick={() => (missingKind = kind)}
+              >{missingLabels[kind]} <span class="count">{count}</span></button
+            >
+          {/each}
+        </div>
+      {/if}
     </div>
+
+    {#if filter === 'missing' && missingAny}
+      <p class="missing-hint">
+        Prices and pack sizes give costs, nutrition and weights give calories, and sections and
+        photos help in the shop.
+      </p>
+    {/if}
 
     {#each groups as g (g.section?.id ?? 'none')}
       <section class="group">
@@ -134,6 +199,8 @@
         <ul class="list">
           {#each g.products as product (product.id)}
             {@const offer = activeOffer(product, today)}
+            {@const nextOffer = nextWeekOffer(product, today)}
+            {@const lacks = missing.get(product.id) ?? []}
             <li>
               <a
                 class="row"
@@ -144,8 +211,16 @@
                 <span class="row-main">
                   <span class="row-title">{product.name}</span>
                   {#if details(product)}<span class="row-sub">{details(product)}</span>{/if}
+                  {#if filter === 'missing' && lacks.length}
+                    <span class="row-sub lacks"
+                      >No {lacks.map((k) => missingLabels[k].toLowerCase()).join(', ')}</span
+                    >
+                  {/if}
                 </span>
                 {#if offer}<span class="pill offer">{formatPrice(offer.price)}</span>{/if}
+                {#if nextOffer && nextOffer.from !== offer?.from}
+                  <span class="pill offer next">Next week {formatPrice(nextOffer.price)}</span>
+                {/if}
                 {#if product.listMode === 'check'}<span class="pill">Ask first</span>{/if}
                 {#if product.listMode === 'skip'}<span class="pill">Never listed</span>{/if}
               </a>
@@ -154,7 +229,11 @@
         </ul>
       </section>
     {:else}
-      <p class="none">No products match.</p>
+      <p class="none">
+        {filter === 'missing' && !missingAny && !query.trim()
+          ? 'Every product has everything it needs.'
+          : 'No products match.'}
+      </p>
     {/each}
   {/if}
 </div>
@@ -192,5 +271,32 @@
     margin: 30px 0;
     color: var(--muted);
     text-align: center;
+  }
+
+  .chip.small {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 0.875rem;
+  }
+
+  .count {
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .missing-hint {
+    margin: -8px 4px 16px;
+    color: var(--muted);
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+
+  .lacks {
+    color: var(--mustard);
+  }
+
+  .pill.next {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--tomato-soft);
   }
 </style>

@@ -32,11 +32,21 @@ export type PackUnit = 'g' | 'ml' | 'pcs';
 /** auto: by amount type. check: always under "Check what you have". skip: never listed. */
 export type ListMode = 'auto' | 'check' | 'skip';
 
+/** Offers run for a week, Thursday to Wednesday (offers.ts). */
 export interface Offer {
   /** Offer price of one pack, in euro. */
   price: number;
-  /** Last day of the offer, YYYY-MM-DD. */
+  /** First day of the offer, YYYY-MM-DD, a Thursday. */
+  from: string;
+  /** Last day of the offer, YYYY-MM-DD, a Wednesday. */
   until: string;
+}
+
+/** The regular price from a day on, for the price graph. */
+export interface PricePoint {
+  /** YYYY-MM-DD */
+  date: string;
+  price: number;
 }
 
 /** Per 100 g, or per 100 ml for products sold by volume, as on EU labels. */
@@ -98,7 +108,10 @@ export interface Product {
   aliases: string[];
   /** Normalised ingredient names its name contains that don't mean it, as "milk" for Coconut milk. */
   notFor?: string[];
-  offer?: Offer;
+  /** Past, current and upcoming offers, in date order. Older versions stored a single `offer`. */
+  offers?: Offer[];
+  /** Regular price changes, oldest first. Recorded when the price changes (priceHistory.ts). */
+  priceLog?: PricePoint[];
   createdAt: string;
   updatedAt: string;
 }
