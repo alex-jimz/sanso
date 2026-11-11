@@ -8,6 +8,7 @@
   import AldiHelper from './pages/AldiHelper.svelte';
   import AldiImport from './pages/AldiImport.svelte';
   import Backup from './pages/Backup.svelte';
+  import BasicFoods from './pages/BasicFoods.svelte';
   import Cook from './pages/Cook.svelte';
   import More from './pages/More.svelte';
   import PhotoTarget from './pages/PhotoTarget.svelte';
@@ -64,6 +65,8 @@
       <Backup />
     {:else if top === 'more' && second === 'recipe-files'}
       <RecipeFiles />
+    {:else if top === 'more' && second === 'basic-foods'}
+      <BasicFoods />
     {:else if top === 'more' && second === 'aldi'}
       <AldiHelper />
     {:else if top === 'aldi'}

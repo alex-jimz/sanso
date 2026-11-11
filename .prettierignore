@@ -3,3 +3,4 @@ dev-dist/
 test-results/
 package-lock.json
 public/icons/
+src/lib/basicFoods.json

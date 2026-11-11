@@ -1,0 +1,1384 @@
+{
+ "source": "USDA FoodData Central, SR Legacy (April 2018), public domain",
+ "foods": [
+  {
+   "name": "Onion",
+   "aliases": [
+    "brown onion",
+    "yellow onion",
+    "white onion",
+    "red onion"
+   ],
+   "usda": "Onions, raw",
+   "fdcId": 170000,
+   "kcal": 40,
+   "protein": 1.1,
+   "fat": 0.1,
+   "carbs": 7.6,
+   "weights": {
+    "piece": 110,
+    "tbsp": 10
+   }
+  },
+  {
+   "name": "Spring onion",
+   "aliases": [
+    "scallion",
+    "green onion",
+    "salad onion"
+   ],
+   "usda": "Onions, spring or scallions (includes tops and bulb), raw",
+   "fdcId": 170005,
+   "kcal": 32,
+   "protein": 1.8,
+   "fat": 0.2,
+   "carbs": 4.7,
+   "weights": {
+    "piece": 15
+   }
+  },
+  {
+   "name": "Shallot",
+   "aliases": [],
+   "usda": "Shallots, raw",
+   "fdcId": 170499,
+   "kcal": 72,
+   "protein": 2.5,
+   "fat": 0.1,
+   "carbs": 13.6,
+   "weights": {
+    "tbsp": 10
+   }
+  },
+  {
+   "name": "Garlic",
+   "aliases": [],
+   "usda": "Garlic, raw",
+   "fdcId": 169230,
+   "kcal": 149,
+   "protein": 6.4,
+   "fat": 0.5,
+   "carbs": 31,
+   "weights": {
+    "clove": 3,
+    "tsp": 2.8
+   }
+  },
+  {
+   "name": "Leek",
+   "aliases": [],
+   "usda": "Leeks, (bulb and lower leaf-portion), raw",
+   "fdcId": 169246,
+   "kcal": 61,
+   "protein": 1.5,
+   "fat": 0.3,
+   "carbs": 12.4,
+   "weights": {
+    "piece": 89
+   }
+  },
+  {
+   "name": "Carrot",
+   "aliases": [],
+   "usda": "Carrots, raw",
+   "fdcId": 170393,
+   "kcal": 41,
+   "protein": 0.9,
+   "fat": 0.2,
+   "carbs": 6.8,
+   "weights": {
+    "piece": 61
+   }
+  },
+  {
+   "name": "Potato",
+   "aliases": [
+    "rooster potato",
+    "baby potato",
+    "new potato",
+    "roosters"
+   ],
+   "usda": "Potatoes, flesh and skin, raw",
+   "fdcId": 170026,
+   "kcal": 77,
+   "protein": 2.1,
+   "fat": 0.1,
+   "carbs": 15.4,
+   "weights": {
+    "piece": 213
+   }
+  },
+  {
+   "name": "Sweet potato",
+   "aliases": [],
+   "usda": "Sweet potato, raw, unprepared (Includes foods for USDA's Food Distribution Program)",
+   "fdcId": 168482,
+   "kcal": 86,
+   "protein": 1.6,
+   "fat": 0.1,
+   "carbs": 17.1,
+   "weights": {
+    "piece": 130
+   }
+  },
+  {
+   "name": "Parsnip",
+   "aliases": [],
+   "usda": "Parsnips, raw",
+   "fdcId": 170417,
+   "kcal": 75,
+   "protein": 1.2,
+   "fat": 0.3,
+   "carbs": 13.1,
+   "weights": {
+    "piece": 133
+   }
+  },
+  {
+   "name": "Turnip",
+   "aliases": [],
+   "usda": "Turnips, raw",
+   "fdcId": 170465,
+   "kcal": 28,
+   "protein": 0.9,
+   "fat": 0.1,
+   "carbs": 4.6,
+   "weights": {
+    "piece": 122
+   }
+  },
+  {
+   "name": "Swede",
+   "aliases": [
+    "rutabaga"
+   ],
+   "usda": "Rutabagas, raw",
+   "fdcId": 168454,
+   "kcal": 37,
+   "protein": 1.1,
+   "fat": 0.2,
+   "carbs": 6.3,
+   "weights": {
+    "piece": 772
+   }
+  },
+  {
+   "name": "Beetroot",
+   "aliases": [
+    "beet"
+   ],
+   "usda": "Beets, raw",
+   "fdcId": 169145,
+   "kcal": 43,
+   "protein": 1.6,
+   "fat": 0.2,
+   "carbs": 6.8,
+   "weights": {
+    "piece": 82
+   }
+  },
+  {
+   "name": "Celery",
+   "aliases": [],
+   "usda": "Celery, raw",
+   "fdcId": 169988,
+   "kcal": 14,
+   "protein": 0.7,
+   "fat": 0.2,
+   "carbs": 1.4,
+   "weights": {
+    "stalk": 40,
+    "piece": 40
+   }
+  },
+  {
+   "name": "Celeriac",
+   "aliases": [],
+   "usda": "Celeriac, raw",
+   "fdcId": 170400,
+   "kcal": 42,
+   "protein": 1.5,
+   "fat": 0.3,
+   "carbs": 7.4
+  },
+  {
+   "name": "Fennel",
+   "aliases": [],
+   "usda": "Fennel, bulb, raw",
+   "fdcId": 169385,
+   "kcal": 31,
+   "protein": 1.2,
+   "fat": 0.2,
+   "carbs": 4.2,
+   "weights": {
+    "piece": 234
+   }
+  },
+  {
+   "name": "Cucumber",
+   "aliases": [],
+   "usda": "Cucumber, with peel, raw",
+   "fdcId": 168409,
+   "kcal": 15,
+   "protein": 0.7,
+   "fat": 0.1,
+   "carbs": 3.1,
+   "weights": {
+    "piece": 301
+   }
+  },
+  {
+   "name": "Tomato",
+   "aliases": [
+    "vine tomato",
+    "salad tomato"
+   ],
+   "usda": "Tomatoes, red, ripe, raw, year round average",
+   "fdcId": 170457,
+   "kcal": 18,
+   "protein": 0.9,
+   "fat": 0.2,
+   "carbs": 2.7,
+   "weights": {
+    "piece": 123
+   }
+  },
+  {
+   "name": "Cherry tomato",
+   "aliases": [],
+   "usda": "Tomatoes, red, ripe, raw, year round average",
+   "fdcId": 170457,
+   "kcal": 18,
+   "protein": 0.9,
+   "fat": 0.2,
+   "carbs": 2.7,
+   "weights": {
+    "piece": 17
+   }
+  },
+  {
+   "name": "Red pepper",
+   "aliases": [
+    "red bell pepper"
+   ],
+   "usda": "Peppers, sweet, red, raw",
+   "fdcId": 170108,
+   "kcal": 26,
+   "protein": 1,
+   "fat": 0.3,
+   "carbs": 3.9,
+   "weights": {
+    "piece": 119
+   }
+  },
+  {
+   "name": "Green pepper",
+   "aliases": [
+    "green bell pepper"
+   ],
+   "usda": "Peppers, sweet, green, raw",
+   "fdcId": 170427,
+   "kcal": 20,
+   "protein": 0.9,
+   "fat": 0.2,
+   "carbs": 2.9,
+   "weights": {
+    "piece": 119
+   }
+  },
+  {
+   "name": "Yellow pepper",
+   "aliases": [
+    "yellow bell pepper"
+   ],
+   "usda": "Peppers, sweet, yellow, raw",
+   "fdcId": 169383,
+   "kcal": 27,
+   "protein": 1,
+   "fat": 0.2,
+   "carbs": 5.4,
+   "weights": {
+    "piece": 186
+   }
+  },
+  {
+   "name": "Chilli",
+   "aliases": [
+    "red chilli",
+    "chili",
+    "fresh chilli"
+   ],
+   "usda": "Peppers, hot chili, red, raw",
+   "fdcId": 170106,
+   "kcal": 40,
+   "protein": 1.9,
+   "fat": 0.4,
+   "carbs": 7.3,
+   "weights": {
+    "piece": 45
+   }
+  },
+  {
+   "name": "Broccoli",
+   "aliases": [
+    "tenderstem broccoli"
+   ],
+   "usda": "Broccoli, raw",
+   "fdcId": 170379,
+   "kcal": 34,
+   "protein": 2.8,
+   "fat": 0.4,
+   "carbs": 4,
+   "weights": {
+    "piece": 608
+   }
+  },
+  {
+   "name": "Cauliflower",
+   "aliases": [],
+   "usda": "Cauliflower, raw",
+   "fdcId": 169986,
+   "kcal": 25,
+   "protein": 1.9,
+   "fat": 0.3,
+   "carbs": 3,
+   "weights": {
+    "piece": 588
+   }
+  },
+  {
+   "name": "Cabbage",
+   "aliases": [
+    "white cabbage",
+    "savoy cabbage",
+    "green cabbage"
+   ],
+   "usda": "Cabbage, raw",
+   "fdcId": 169975,
+   "kcal": 25,
+   "protein": 1.3,
+   "fat": 0.1,
+   "carbs": 3.3,
+   "weights": {
+    "piece": 908
+   }
+  },
+  {
+   "name": "Red cabbage",
+   "aliases": [],
+   "usda": "Cabbage, red, raw",
+   "fdcId": 169977,
+   "kcal": 31,
+   "protein": 1.4,
+   "fat": 0.2,
+   "carbs": 5.3,
+   "weights": {
+    "piece": 839
+   }
+  },
+  {
+   "name": "Brussels sprout",
+   "aliases": [],
+   "usda": "Brussels sprouts, raw",
+   "fdcId": 170383,
+   "kcal": 43,
+   "protein": 3.4,
+   "fat": 0.3,
+   "carbs": 5.1,
+   "weights": {
+    "piece": 19
+   }
+  },
+  {
+   "name": "Pak choi",
+   "aliases": [
+    "bok choy"
+   ],
+   "usda": "Cabbage, chinese (pak-choi), raw",
+   "fdcId": 170390,
+   "kcal": 13,
+   "protein": 1.5,
+   "fat": 0.2,
+   "carbs": 1.2
+  },
+  {
+   "name": "Kale",
+   "aliases": [],
+   "usda": "Kale, raw",
+   "fdcId": 168421,
+   "kcal": 35,
+   "protein": 2.9,
+   "fat": 1.5,
+   "carbs": 0.3
+  },
+  {
+   "name": "Spinach",
+   "aliases": [
+    "baby spinach"
+   ],
+   "usda": "Spinach, raw",
+   "fdcId": 168462,
+   "kcal": 23,
+   "protein": 2.9,
+   "fat": 0.4,
+   "carbs": 1.4
+  },
+  {
+   "name": "Rocket",
+   "aliases": [
+    "arugula"
+   ],
+   "usda": "Arugula, raw",
+   "fdcId": 169387,
+   "kcal": 25,
+   "protein": 2.6,
+   "fat": 0.7,
+   "carbs": 2.1
+  },
+  {
+   "name": "Iceberg lettuce",
+   "aliases": [
+    "lettuce"
+   ],
+   "usda": "Lettuce, iceberg (includes crisphead types), raw",
+   "fdcId": 169248,
+   "kcal": 14,
+   "protein": 0.9,
+   "fat": 0.1,
+   "carbs": 1.8,
+   "weights": {
+    "piece": 539
+   }
+  },
+  {
+   "name": "Romaine lettuce",
+   "aliases": [
+    "cos lettuce",
+    "little gem"
+   ],
+   "usda": "Lettuce, cos or romaine, raw",
+   "fdcId": 169247,
+   "kcal": 17,
+   "protein": 1.2,
+   "fat": 0.3,
+   "carbs": 1.2,
+   "weights": {
+    "piece": 626
+   }
+  },
+  {
+   "name": "Courgette",
+   "aliases": [
+    "zucchini"
+   ],
+   "usda": "Squash, summer, zucchini, includes skin, raw",
+   "fdcId": 169291,
+   "kcal": 17,
+   "protein": 1.2,
+   "fat": 0.3,
+   "carbs": 2.1,
+   "weights": {
+    "piece": 196
+   }
+  },
+  {
+   "name": "Aubergine",
+   "aliases": [
+    "eggplant"
+   ],
+   "usda": "Eggplant, raw",
+   "fdcId": 169228,
+   "kcal": 25,
+   "protein": 1,
+   "fat": 0.2,
+   "carbs": 2.9,
+   "weights": {
+    "piece": 458
+   }
+  },
+  {
+   "name": "Butternut squash",
+   "aliases": [],
+   "usda": "Squash, winter, butternut, raw",
+   "fdcId": 169295,
+   "kcal": 45,
+   "protein": 1,
+   "fat": 0.1,
+   "carbs": 9.7
+  },
+  {
+   "name": "Pumpkin",
+   "aliases": [],
+   "usda": "Pumpkin, raw",
+   "fdcId": 168448,
+   "kcal": 26,
+   "protein": 1,
+   "fat": 0.1,
+   "carbs": 6
+  },
+  {
+   "name": "Mushroom",
+   "aliases": [
+    "button mushroom",
+    "white mushroom",
+    "closed cup mushroom"
+   ],
+   "usda": "Mushrooms, white, raw",
+   "fdcId": 169251,
+   "kcal": 22,
+   "protein": 3.1,
+   "fat": 0.3,
+   "carbs": 2.3,
+   "weights": {
+    "piece": 18
+   }
+  },
+  {
+   "name": "Chestnut mushroom",
+   "aliases": [
+    "brown mushroom",
+    "crimini mushroom"
+   ],
+   "usda": "Mushrooms, brown, italian, or crimini, raw",
+   "fdcId": 168434,
+   "kcal": 22,
+   "protein": 2.5,
+   "fat": 0.1,
+   "carbs": 3.7,
+   "weights": {
+    "piece": 20
+   }
+  },
+  {
+   "name": "Green beans",
+   "aliases": [
+    "fine beans",
+    "french beans"
+   ],
+   "usda": "Beans, snap, green, raw",
+   "fdcId": 169961,
+   "kcal": 31,
+   "protein": 1.8,
+   "fat": 0.2,
+   "carbs": 4.3
+  },
+  {
+   "name": "Peas",
+   "aliases": [
+    "garden peas",
+    "frozen peas"
+   ],
+   "usda": "Peas, green, raw",
+   "fdcId": 170419,
+   "kcal": 81,
+   "protein": 5.4,
+   "fat": 0.4,
+   "carbs": 8.8
+  },
+  {
+   "name": "Sweetcorn",
+   "aliases": [
+    "corn",
+    "corn on the cob"
+   ],
+   "usda": "Corn, sweet, yellow, raw",
+   "fdcId": 169998,
+   "kcal": 86,
+   "protein": 3.3,
+   "fat": 1.4,
+   "carbs": 16.7,
+   "weights": {
+    "piece": 102
+   }
+  },
+  {
+   "name": "Asparagus",
+   "aliases": [],
+   "usda": "Asparagus, raw",
+   "fdcId": 168389,
+   "kcal": 20,
+   "protein": 2.2,
+   "fat": 0.1,
+   "carbs": 1.8,
+   "weights": {
+    "piece": 16
+   }
+  },
+  {
+   "name": "Radish",
+   "aliases": [],
+   "usda": "Radishes, raw",
+   "fdcId": 169276,
+   "kcal": 16,
+   "protein": 0.7,
+   "fat": 0.1,
+   "carbs": 1.8,
+   "weights": {
+    "piece": 4.5
+   }
+  },
+  {
+   "name": "Ginger",
+   "aliases": [
+    "fresh ginger",
+    "root ginger"
+   ],
+   "usda": "Ginger root, raw",
+   "fdcId": 169231,
+   "kcal": 80,
+   "protein": 1.8,
+   "fat": 0.8,
+   "carbs": 15.8,
+   "weights": {
+    "tsp": 2
+   }
+  },
+  {
+   "name": "Parsley",
+   "aliases": [
+    "flat leaf parsley",
+    "curly parsley"
+   ],
+   "usda": "Parsley, fresh",
+   "fdcId": 170416,
+   "kcal": 36,
+   "protein": 3,
+   "fat": 0.8,
+   "carbs": 3,
+   "weights": {
+    "tbsp": 3.8,
+    "sprig": 1
+   }
+  },
+  {
+   "name": "Coriander",
+   "aliases": [
+    "fresh coriander",
+    "cilantro"
+   ],
+   "usda": "Coriander (cilantro) leaves, raw",
+   "fdcId": 169997,
+   "kcal": 23,
+   "protein": 2.1,
+   "fat": 0.5,
+   "carbs": 0.9,
+   "weights": {
+    "sprig": 2.2
+   }
+  },
+  {
+   "name": "Basil",
+   "aliases": [
+    "fresh basil"
+   ],
+   "usda": "Basil, fresh",
+   "fdcId": 172232,
+   "kcal": 23,
+   "protein": 3.2,
+   "fat": 0.6,
+   "carbs": 1,
+   "weights": {
+    "tbsp": 2.7
+   }
+  },
+  {
+   "name": "Mint",
+   "aliases": [
+    "fresh mint"
+   ],
+   "usda": "Spearmint, fresh",
+   "fdcId": 173475,
+   "kcal": 44,
+   "protein": 3.3,
+   "fat": 0.7,
+   "carbs": 1.6,
+   "weights": {
+    "tbsp": 5.7
+   }
+  },
+  {
+   "name": "Banana",
+   "aliases": [],
+   "usda": "Bananas, raw",
+   "fdcId": 173944,
+   "kcal": 89,
+   "protein": 1.1,
+   "fat": 0.3,
+   "carbs": 20.2,
+   "weights": {
+    "piece": 118
+   }
+  },
+  {
+   "name": "Apple",
+   "aliases": [],
+   "usda": "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",
+   "fdcId": 171688,
+   "kcal": 52,
+   "protein": 0.3,
+   "fat": 0.2,
+   "carbs": 11.4,
+   "weights": {
+    "piece": 182
+   }
+  },
+  {
+   "name": "Pear",
+   "aliases": [],
+   "usda": "Pears, raw",
+   "fdcId": 169118,
+   "kcal": 57,
+   "protein": 0.4,
+   "fat": 0.1,
+   "carbs": 12.1,
+   "weights": {
+    "piece": 178
+   }
+  },
+  {
+   "name": "Orange",
+   "aliases": [],
+   "usda": "Oranges, raw, all commercial varieties",
+   "fdcId": 169097,
+   "kcal": 47,
+   "protein": 0.9,
+   "fat": 0.1,
+   "carbs": 9.4,
+   "weights": {
+    "piece": 131
+   }
+  },
+  {
+   "name": "Mandarin",
+   "aliases": [
+    "easy peeler",
+    "clementine",
+    "satsuma",
+    "tangerine"
+   ],
+   "usda": "Tangerines, (mandarin oranges), raw",
+   "fdcId": 169105,
+   "kcal": 53,
+   "protein": 0.8,
+   "fat": 0.3,
+   "carbs": 11.5,
+   "weights": {
+    "piece": 88
+   }
+  },
+  {
+   "name": "Lemon",
+   "aliases": [],
+   "usda": "Lemons, raw, without peel",
+   "fdcId": 167746,
+   "kcal": 29,
+   "protein": 1.1,
+   "fat": 0.3,
+   "carbs": 6.5,
+   "weights": {
+    "piece": 58
+   }
+  },
+  {
+   "name": "Lime",
+   "aliases": [],
+   "usda": "Limes, raw",
+   "fdcId": 168155,
+   "kcal": 30,
+   "protein": 0.7,
+   "fat": 0.2,
+   "carbs": 7.7,
+   "weights": {
+    "piece": 67
+   }
+  },
+  {
+   "name": "Grapes",
+   "aliases": [
+    "grape",
+    "seedless grapes"
+   ],
+   "usda": "Grapes, red or green (European type, such as Thompson seedless), raw",
+   "fdcId": 174683,
+   "kcal": 69,
+   "protein": 0.7,
+   "fat": 0.2,
+   "carbs": 17.2,
+   "weights": {
+    "piece": 4.9
+   }
+  },
+  {
+   "name": "Strawberries",
+   "aliases": [
+    "strawberry"
+   ],
+   "usda": "Strawberries, raw",
+   "fdcId": 167762,
+   "kcal": 32,
+   "protein": 0.7,
+   "fat": 0.3,
+   "carbs": 5.7,
+   "weights": {
+    "piece": 12
+   }
+  },
+  {
+   "name": "Blueberries",
+   "aliases": [
+    "blueberry"
+   ],
+   "usda": "Blueberries, raw",
+   "fdcId": 171711,
+   "kcal": 57,
+   "protein": 0.7,
+   "fat": 0.3,
+   "carbs": 12.1
+  },
+  {
+   "name": "Raspberries",
+   "aliases": [
+    "raspberry"
+   ],
+   "usda": "Raspberries, raw",
+   "fdcId": 167755,
+   "kcal": 52,
+   "protein": 1.2,
+   "fat": 0.7,
+   "carbs": 5.4
+  },
+  {
+   "name": "Kiwi",
+   "aliases": [
+    "kiwi fruit",
+    "kiwifruit"
+   ],
+   "usda": "Kiwifruit, green, raw",
+   "fdcId": 168153,
+   "kcal": 61,
+   "protein": 1.1,
+   "fat": 0.5,
+   "carbs": 11.7,
+   "weights": {
+    "piece": 69
+   }
+  },
+  {
+   "name": "Mango",
+   "aliases": [],
+   "usda": "Mangos, raw",
+   "fdcId": 169910,
+   "kcal": 60,
+   "protein": 0.8,
+   "fat": 0.4,
+   "carbs": 13.4,
+   "weights": {
+    "piece": 336
+   }
+  },
+  {
+   "name": "Pineapple",
+   "aliases": [],
+   "usda": "Pineapple, raw, all varieties",
+   "fdcId": 169124,
+   "kcal": 50,
+   "protein": 0.5,
+   "fat": 0.1,
+   "carbs": 11.7,
+   "weights": {
+    "piece": 905
+   }
+  },
+  {
+   "name": "Peach",
+   "aliases": [],
+   "usda": "Peaches, yellow, raw",
+   "fdcId": 169928,
+   "kcal": 39,
+   "protein": 0.9,
+   "fat": 0.3,
+   "carbs": 8,
+   "weights": {
+    "piece": 150
+   }
+  },
+  {
+   "name": "Nectarine",
+   "aliases": [],
+   "usda": "Nectarines, raw",
+   "fdcId": 169914,
+   "kcal": 44,
+   "protein": 1.1,
+   "fat": 0.3,
+   "carbs": 8.9,
+   "weights": {
+    "piece": 142
+   }
+  },
+  {
+   "name": "Plum",
+   "aliases": [],
+   "usda": "Plums, raw",
+   "fdcId": 169949,
+   "kcal": 46,
+   "protein": 0.7,
+   "fat": 0.3,
+   "carbs": 10,
+   "weights": {
+    "piece": 66
+   }
+  },
+  {
+   "name": "Avocado",
+   "aliases": [],
+   "usda": "Avocados, raw, all commercial varieties",
+   "fdcId": 171705,
+   "kcal": 160,
+   "protein": 2,
+   "fat": 14.7,
+   "carbs": 1.8,
+   "weights": {
+    "piece": 201
+   }
+  },
+  {
+   "name": "Melon",
+   "aliases": [
+    "cantaloupe"
+   ],
+   "usda": "Melons, cantaloupe, raw",
+   "fdcId": 169092,
+   "kcal": 34,
+   "protein": 0.8,
+   "fat": 0.2,
+   "carbs": 7.3
+  },
+  {
+   "name": "Watermelon",
+   "aliases": [],
+   "usda": "Watermelon, raw",
+   "fdcId": 167765,
+   "kcal": 30,
+   "protein": 0.6,
+   "fat": 0.2,
+   "carbs": 7.2
+  },
+  {
+   "name": "Egg",
+   "aliases": [
+    "free range egg",
+    "large egg"
+   ],
+   "usda": "Egg, whole, raw, fresh",
+   "fdcId": 171287,
+   "kcal": 143,
+   "protein": 12.6,
+   "fat": 9.5,
+   "carbs": 0.7,
+   "weights": {
+    "piece": 50
+   }
+  },
+  {
+   "name": "Whole chicken",
+   "aliases": [
+    "chicken"
+   ],
+   "usda": "Chicken, broilers or fryers, meat and skin, raw",
+   "fdcId": 171447,
+   "kcal": 215,
+   "protein": 18.6,
+   "fat": 15.1,
+   "carbs": 0
+  },
+  {
+   "name": "Chicken breast",
+   "aliases": [
+    "chicken fillet",
+    "chicken breast fillet"
+   ],
+   "usda": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw",
+   "fdcId": 171077,
+   "kcal": 120,
+   "protein": 22.5,
+   "fat": 2.6,
+   "carbs": 0
+  },
+  {
+   "name": "Chicken thighs",
+   "aliases": [
+    "chicken thigh",
+    "chicken thigh fillet",
+    "boneless chicken thigh"
+   ],
+   "usda": "Chicken, broilers or fryers, dark meat, thigh, meat only, raw",
+   "fdcId": 173627,
+   "kcal": 121,
+   "protein": 19.7,
+   "fat": 4.1,
+   "carbs": 0,
+   "weights": {
+    "piece": 149
+   }
+  },
+  {
+   "name": "Chicken drumsticks",
+   "aliases": [
+    "chicken drumstick",
+    "drumstick"
+   ],
+   "usda": "Chicken, broilers or fryers, drumstick, meat and skin, raw",
+   "fdcId": 172373,
+   "kcal": 161,
+   "protein": 18.1,
+   "fat": 9.2,
+   "carbs": 0.1,
+   "weights": {
+    "piece": 133
+   }
+  },
+  {
+   "name": "Chicken wings",
+   "aliases": [
+    "chicken wing",
+    "wing"
+   ],
+   "usda": "Chicken, broilers or fryers, wing, meat and skin, raw",
+   "fdcId": 172390,
+   "kcal": 191,
+   "protein": 17.5,
+   "fat": 12.9,
+   "carbs": 0,
+   "weights": {
+    "piece": 107
+   }
+  },
+  {
+   "name": "Beef mince 5% fat",
+   "aliases": [
+    "lean beef mince",
+    "extra lean beef mince",
+    "ground beef 5% fat"
+   ],
+   "usda": "Beef, ground, 95% lean meat / 5% fat, raw",
+   "fdcId": 171790,
+   "kcal": 137,
+   "protein": 21.4,
+   "fat": 5,
+   "carbs": 0
+  },
+  {
+   "name": "Beef mince 10% fat",
+   "aliases": [
+    "beef mince",
+    "minced beef",
+    "ground beef",
+    "ground beef 10% fat"
+   ],
+   "usda": "Beef, ground, 90% lean meat / 10% fat, raw",
+   "fdcId": 174030,
+   "kcal": 176,
+   "protein": 20,
+   "fat": 10,
+   "carbs": 0
+  },
+  {
+   "name": "Beef mince 15% fat",
+   "aliases": [
+    "ground beef 15% fat"
+   ],
+   "usda": "Beef, ground, 85% lean meat / 15% fat, raw (Includes foods for USDA's Food Distribution Program)",
+   "fdcId": 171796,
+   "kcal": 215,
+   "protein": 18.6,
+   "fat": 15,
+   "carbs": 0
+  },
+  {
+   "name": "Beef mince 20% fat",
+   "aliases": [
+    "ground beef 20% fat"
+   ],
+   "usda": "Beef, ground, 80% lean meat / 20% fat, raw",
+   "fdcId": 174036,
+   "kcal": 254,
+   "protein": 17.2,
+   "fat": 20,
+   "carbs": 0
+  },
+  {
+   "name": "Pork mince",
+   "aliases": [
+    "minced pork",
+    "ground pork"
+   ],
+   "usda": "Pork, fresh, ground, raw",
+   "fdcId": 167902,
+   "kcal": 263,
+   "protein": 16.9,
+   "fat": 21.2,
+   "carbs": 0
+  },
+  {
+   "name": "Lamb mince",
+   "aliases": [
+    "minced lamb",
+    "ground lamb"
+   ],
+   "usda": "Lamb, ground, raw",
+   "fdcId": 174370,
+   "kcal": 282,
+   "protein": 16.6,
+   "fat": 23.4,
+   "carbs": 0
+  },
+  {
+   "name": "Pork belly",
+   "aliases": [],
+   "usda": "Pork, fresh, belly, raw",
+   "fdcId": 167812,
+   "kcal": 518,
+   "protein": 9.3,
+   "fat": 53,
+   "carbs": 0
+  },
+  {
+   "name": "Salmon",
+   "aliases": [
+    "salmon fillet"
+   ],
+   "usda": "Fish, salmon, Atlantic, farmed, raw",
+   "fdcId": 175167,
+   "kcal": 208,
+   "protein": 20.4,
+   "fat": 13.4,
+   "carbs": 0
+  },
+  {
+   "name": "Cod",
+   "aliases": [
+    "cod fillet"
+   ],
+   "usda": "Fish, cod, Atlantic, raw",
+   "fdcId": 171955,
+   "kcal": 82,
+   "protein": 17.8,
+   "fat": 0.7,
+   "carbs": 0
+  },
+  {
+   "name": "Haddock",
+   "aliases": [
+    "haddock fillet"
+   ],
+   "usda": "Fish, haddock, raw",
+   "fdcId": 171964,
+   "kcal": 74,
+   "protein": 16.3,
+   "fat": 0.5,
+   "carbs": 0
+  },
+  {
+   "name": "Mackerel",
+   "aliases": [
+    "mackerel fillet"
+   ],
+   "usda": "Fish, mackerel, Atlantic, raw",
+   "fdcId": 175119,
+   "kcal": 205,
+   "protein": 18.6,
+   "fat": 13.9,
+   "carbs": 0,
+   "weights": {
+    "fillet": 112,
+    "piece": 112
+   }
+  },
+  {
+   "name": "Prawns",
+   "aliases": [
+    "prawn",
+    "shrimp",
+    "king prawn"
+   ],
+   "usda": "Crustaceans, shrimp, raw",
+   "fdcId": 175179,
+   "kcal": 85,
+   "protein": 20.1,
+   "fat": 0.5,
+   "carbs": 0
+  },
+  {
+   "name": "Olive oil",
+   "aliases": [
+    "extra virgin olive oil"
+   ],
+   "usda": "Oil, olive, salad or cooking",
+   "fdcId": 171413,
+   "kcal": 884,
+   "protein": 0,
+   "fat": 100,
+   "carbs": 0,
+   "weights": {
+    "tbsp": 13.5,
+    "tsp": 4.5
+   }
+  },
+  {
+   "name": "Sunflower oil",
+   "aliases": [
+    "vegetable oil",
+    "rapeseed oil"
+   ],
+   "usda": "Oil, sunflower, linoleic, (approx. 65%)",
+   "fdcId": 171025,
+   "kcal": 884,
+   "protein": 0,
+   "fat": 100,
+   "carbs": 0,
+   "weights": {
+    "tbsp": 13.6,
+    "tsp": 4.5
+   }
+  },
+  {
+   "name": "Butter",
+   "aliases": [],
+   "usda": "Butter, salted",
+   "fdcId": 173410,
+   "kcal": 717,
+   "protein": 0.9,
+   "fat": 81.1,
+   "carbs": 0.1,
+   "weights": {
+    "tbsp": 14.2
+   }
+  },
+  {
+   "name": "Sugar",
+   "aliases": [
+    "caster sugar",
+    "white sugar",
+    "granulated sugar"
+   ],
+   "usda": "Sugars, granulated",
+   "fdcId": 169655,
+   "kcal": 387,
+   "protein": 0,
+   "fat": 0,
+   "carbs": 100,
+   "weights": {
+    "tsp": 4.2,
+    "cup": 200
+   }
+  },
+  {
+   "name": "Honey",
+   "aliases": [],
+   "usda": "Honey",
+   "fdcId": 169640,
+   "kcal": 304,
+   "protein": 0.3,
+   "fat": 0,
+   "carbs": 82.2,
+   "weights": {
+    "tbsp": 21
+   }
+  },
+  {
+   "name": "Plain flour",
+   "aliases": [
+    "flour",
+    "all purpose flour"
+   ],
+   "usda": "Wheat flour, white, all-purpose, enriched, bleached",
+   "fdcId": 168894,
+   "kcal": 364,
+   "protein": 10.3,
+   "fat": 1,
+   "carbs": 73.6,
+   "weights": {
+    "cup": 125
+   }
+  },
+  {
+   "name": "Rice",
+   "aliases": [
+    "white rice",
+    "basmati rice",
+    "long grain rice"
+   ],
+   "usda": "Rice, white, long-grain, regular, raw, enriched",
+   "fdcId": 168877,
+   "kcal": 365,
+   "protein": 7.1,
+   "fat": 0.7,
+   "carbs": 78.7,
+   "weights": {
+    "cup": 185
+   }
+  },
+  {
+   "name": "Brown rice",
+   "aliases": [],
+   "usda": "Rice, brown, long-grain, raw (Includes foods for USDA's Food Distribution Program)",
+   "fdcId": 169703,
+   "kcal": 367,
+   "protein": 7.5,
+   "fat": 3.2,
+   "carbs": 72.7,
+   "weights": {
+    "cup": 185
+   }
+  },
+  {
+   "name": "Pasta",
+   "aliases": [
+    "spaghetti",
+    "penne",
+    "fusilli",
+    "dry pasta"
+   ],
+   "usda": "Pasta, dry, enriched",
+   "fdcId": 169736,
+   "kcal": 371,
+   "protein": 13,
+   "fat": 1.5,
+   "carbs": 71.5
+  },
+  {
+   "name": "Oats",
+   "aliases": [
+    "porridge oats",
+    "rolled oats"
+   ],
+   "usda": "Cereals, oats, regular and quick, not fortified, dry",
+   "fdcId": 173904,
+   "kcal": 379,
+   "protein": 13.2,
+   "fat": 6.5,
+   "carbs": 57.6,
+   "weights": {
+    "cup": 81
+   }
+  },
+  {
+   "name": "Lentils",
+   "aliases": [
+    "red lentils",
+    "green lentils",
+    "brown lentils",
+    "lentil"
+   ],
+   "usda": "Lentils, raw",
+   "fdcId": 172420,
+   "kcal": 352,
+   "protein": 24.6,
+   "fat": 1.1,
+   "carbs": 52.7,
+   "weights": {
+    "cup": 192
+   }
+  }
+ ]
+}

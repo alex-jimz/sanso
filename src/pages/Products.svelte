@@ -1,5 +1,6 @@
 <script lang="ts">
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import Leaf from '@lucide/svelte/icons/leaf';
   import Package from '@lucide/svelte/icons/package';
   import Plus from '@lucide/svelte/icons/plus';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
@@ -191,6 +192,16 @@
         Prices and pack sizes give costs, nutrition and weights give calories, and sections and
         photos help in the shop.
       </p>
+      {#if missingCounts.some((k) => k.kind === 'nutrition' || k.kind === 'weights')}
+        <a
+          class="aldi basic"
+          href="#/more/basic-foods"
+          onclick={(e) => open(e, '/more/basic-foods')}
+        >
+          <Leaf size={18} />
+          <span>Fill in nutrition for fresh food from basic foods</span>
+        </a>
+      {/if}
     {/if}
 
     {#each groups as g (g.section?.id ?? 'none')}
@@ -245,6 +256,10 @@
     margin: 8px 0 20px;
   }
 
+  .aldi.basic {
+    margin: 0 0 18px;
+  }
+
   .aldi {
     display: flex;
     align-items: center;
@@ -285,7 +300,7 @@
   }
 
   .missing-hint {
-    margin: -8px 4px 16px;
+    margin: -8px 4px 12px;
     color: var(--muted);
     font-size: 0.875rem;
     line-height: 1.4;

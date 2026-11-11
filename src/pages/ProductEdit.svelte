@@ -3,6 +3,7 @@
   import ClipboardPaste from '@lucide/svelte/icons/clipboard-paste';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
+  import Leaf from '@lucide/svelte/icons/leaf';
   import Plus from '@lucide/svelte/icons/plus';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import Tag from '@lucide/svelte/icons/tag';
@@ -10,10 +11,12 @@
   import X from '@lucide/svelte/icons/x';
   import { untrack } from 'svelte';
   import ProductPickerSheet from '../components/ProductPickerSheet.svelte';
+  import BasicFoodSheet from '../components/BasicFoodSheet.svelte';
   import SectionPicker from '../components/SectionPicker.svelte';
   import ProductPhoto from '../components/ProductPhoto.svelte';
   import PriceHistory from '../components/PriceHistory.svelte';
   import { cleanBreakdown, isShopProduct } from '../lib/breakdown';
+  import { foodNutrition, suggestBasicFood, type BasicFood } from '../lib/basicFoods';
   import { readClipboardImage, resizePhoto } from '../lib/photos';
   import { formatDayMonth, formatWeekday, todayISO } from '../lib/dates';
   import { normalizeName } from '../lib/ingredients';
@@ -229,8 +232,29 @@
     return recipeLines.filter((line) => names.has(normalizeName(line.name)));
   });
   const neededWeights = $derived(
-    weightsNeeded({ weights: base.weights, packSize: parseDecimal(packSize), packUnit }, ownLines),
+    weightsNeeded(
+      {
+        // Weights being edited stay listed, including ones a basic food just filled in.
+        weights: Object.fromEntries(Object.keys(weights).map((k) => [k, 1])),
+        packSize: parseDecimal(packSize),
+        packUnit,
+      },
+      ownLines,
+    ),
   );
+
+  // Basic foods: values for fresh produce and other things without a label.
+  let foodSheetOpen = $state(false);
+  const suggestedFood = $derived(suggestBasicFood(name));
+  let filledFrom = $state<BasicFood>();
+
+  function useFood(food: BasicFood) {
+    for (const key of nutrientKeys) nutrition[key] = String(foodNutrition(food)[key]);
+    // Weights already typed stay; the food only adds the ones missing.
+    for (const [key, grams] of Object.entries(food.weights ?? {}))
+      if (!parseDecimal(weights[key])) weights[key] = String(grams);
+    filledFrom = food;
+  }
 
   const shops: { id: Shop; label: string }[] = [
     { id: 'aldi', label: 'Aldi' },
@@ -606,6 +630,32 @@
         <input type="checkbox" role="switch" bind:checked={negligible} />
       </label>
       {#if !negligible}
+        <div class="food-fill">
+          {#if filledFrom}
+            <p class="hint filled">
+              Filled in from {filledFrom.name} in the basic foods table (USDA: {filledFrom.usda}).
+              Change any value if yours differs, then save.
+            </p>
+          {/if}
+          <div class="food-actions">
+            {#if suggestedFood && filledFrom?.name !== suggestedFood.name}
+              <button
+                class="btn btn-small btn-outline"
+                type="button"
+                onclick={() => useFood(suggestedFood)}
+              >
+                <Leaf size={16} /> Use values for {suggestedFood.name}
+              </button>
+            {/if}
+            <button
+              class="btn btn-small btn-quiet"
+              type="button"
+              onclick={() => (foodSheetOpen = true)}
+            >
+              {#if suggestedFood}Other basic food{:else}<Leaf size={16} /> Fill from basic foods{/if}
+            </button>
+          </div>
+        </div>
         <div class="nutrients">
           {#each nutrientKeys as key (key)}
             <label class="field">
@@ -877,6 +927,8 @@
   </form>
 </div>
 
+<BasicFoodSheet bind:open={foodSheetOpen} suggested={suggestedFood} onpick={useFood} />
+
 <ProductPickerSheet
   bind:open={partPickerOpen}
   title="Add a part"
@@ -1092,6 +1144,25 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+  }
+
+  .food-fill {
+    display: grid;
+    gap: 8px;
+  }
+
+  .food-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .filled {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
   }
 
   .with-suffix {

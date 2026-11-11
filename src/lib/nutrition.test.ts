@@ -142,6 +142,19 @@ describe('recipeFacts', () => {
     expect(facts.nutrition.protein).toBeCloseTo((120 + 1.65 + 0.96) / 2);
     expect(facts.cost).toBeCloseTo((4 + 0.15 + 0.09) / 2);
   });
+
+  it('costs recipes at regular prices, even while a product is on offer', () => {
+    // An offer that covers any day the test runs on: 500 g at €8 per kg is €4, not €2.
+    const onOffer = {
+      ...chicken,
+      offers: [{ price: 4, from: '2000-01-06', until: '2999-12-31' }],
+    };
+    const facts = recipeFacts(
+      { portions: 1, ingredients: ['500 g chicken breast'] },
+      productResolver([onOffer]),
+    );
+    expect(facts.cost).toBeCloseTo(4);
+  });
 });
 
 describe('weightsNeeded', () => {
