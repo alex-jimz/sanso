@@ -1,17 +1,19 @@
 <script lang="ts">
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
-  import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
   import CalendarPlus from '@lucide/svelte/icons/calendar-plus';
   import FileDown from '@lucide/svelte/icons/file-down';
+  import Link2Off from '@lucide/svelte/icons/link-2-off';
   import Pencil from '@lucide/svelte/icons/pencil';
-  import ChoiceSheet from '../components/ChoiceSheet.svelte';
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+  import IngredientSheet from '../components/IngredientSheet.svelte';
   import PlanPickerSheet from '../components/PlanPickerSheet.svelte';
   import PortionFacts from '../components/PortionFacts.svelte';
   import RecipePdfSheet from '../components/RecipePdfSheet.svelte';
   import RecipePhoto from '../components/RecipePhoto.svelte';
   import Stepper from '../components/Stepper.svelte';
-  import { hasOptions, withChoice, type IngredientRow, type Option } from '../lib/choices';
-  import { capitalize, displayParts } from '../lib/ingredients';
+  import { withChoice, type IngredientRow, type Option } from '../lib/choices';
+  import { displayParts, normalizeName, type ParsedLine } from '../lib/ingredients';
+  import { lineStatus, missingPhrases, optionFacts, type LineStatus } from '../lib/lineStatus';
   import { formatMinutes } from '../lib/quantity';
   import { router } from '../lib/router.svelte';
   import { store } from '../lib/store.svelte';
@@ -37,6 +39,50 @@
     await store.setRecipeChoices(recipe.id, withChoice(rows, row, option.key));
     await store.learnPick(row, option);
   }
+
+  /** From the "What's missing" sheet: an ingredient with no product. */
+  function openLine(line: ParsedLine) {
+    const row = rows.find(
+      (r): r is IngredientRow => !r.heading && r.chosen.line.text === line.text,
+    );
+    if (row) openChoice(row);
+  }
+
+  interface LineInfo {
+    status: LineStatus;
+    /** Under the line: the product, if it isn't obvious, and what's missing. */
+    sub: string;
+    label: string;
+  }
+
+  function lineInfo(row: IngredientRow): LineInfo {
+    const { product, line } = row.chosen;
+    const facts = optionFacts(row.chosen, store.priced);
+    const status = lineStatus(facts);
+    const parts: string[] = [];
+    const count = row.options.filter((o) => o.product).length;
+    if (product && (count > 1 || normalizeName(product.name) !== normalizeName(line.name)))
+      parts.push(product.name);
+    if (row.options.length > 1) parts.push(`${row.options.length} options`);
+    if (status === 'unlinked') parts.push('No product yet');
+    if (status === 'incomplete' && facts) {
+      const isPart = !!product && !!store.sources.get(product.id)?.length;
+      parts.push(`needs ${missingPhrases(facts.missing, isPart).join(', ')}`);
+    }
+    const sub = parts.join(' · ');
+    const label =
+      status === 'unlinked'
+        ? 'Not linked to a product'
+        : status === 'incomplete'
+          ? 'Product is missing information'
+          : 'Linked';
+    return { status, sub: sub && sub[0]!.toUpperCase() + sub.slice(1), label };
+  }
+
+  const infos = $derived(rows.map((r) => (r.heading ? undefined : lineInfo(r))));
+  const needsWork = $derived(
+    infos.some((i) => i?.status === 'unlinked' || i?.status === 'incomplete'),
+  );
 
   $effect(() => {
     if (recipe) portions = recipe.portions;
@@ -127,7 +173,7 @@
         </dl>
       {/if}
 
-      <PortionFacts {recipe} />
+      <PortionFacts {recipe} onunlinked={openLine} />
 
       <section>
         <div class="section-head">
@@ -148,21 +194,46 @@
                 <li class="group">{row.line.name}</li>
               {:else}
                 {@const parts = displayParts(row.chosen.line, factor)}
+                {@const info = infos[i]}
                 <li>
-                  {parts.before}{#if parts.amount}<strong>{parts.amount}</strong>{/if}{parts.after}
-                  {#if hasOptions(row)}
-                    <button class="pick" type="button" onclick={() => openChoice(row)}>
-                      <ArrowLeftRight size={14} />
+                  <button class="line" type="button" onclick={() => openChoice(row)}>
+                    <span class="line-main">
                       <span
-                        >{row.chosen.product?.name ?? capitalize(row.chosen.line.name)} · {row
-                          .options.length} options</span
+                        >{parts.before}{#if parts.amount}<strong>{parts.amount}</strong
+                          >{/if}{parts.after}</span
                       >
-                    </button>
-                  {/if}
+                      {#if info?.sub}<span class="line-sub">{info.sub}</span>{/if}
+                    </span>
+                    {#if info?.status === 'unlinked'}
+                      <span class="status unlinked" role="img" aria-label={info.label}
+                        ><Link2Off size={15} strokeWidth={2.4} /></span
+                      >
+                    {:else if info?.status === 'incomplete'}
+                      <span class="status incomplete" role="img" aria-label={info.label}
+                        ><TriangleAlert size={15} strokeWidth={2.4} /></span
+                      >
+                    {/if}
+                  </button>
                 </li>
               {/if}
             {/each}
           </ul>
+          <p class="hint signs-key">
+            {#if needsWork}
+              <span class="key"
+                ><span class="status unlinked small"><Link2Off size={11} strokeWidth={2.6} /></span>
+                No product</span
+              >
+              <span class="key"
+                ><span class="status incomplete small"
+                  ><TriangleAlert size={11} strokeWidth={2.6} /></span
+                > Product missing info</span
+              >
+              <span>Tap an ingredient to fix it.</span>
+            {:else}
+              Tap an ingredient to change its product.
+            {/if}
+          </p>
         {:else}
           <p class="hint">No ingredients yet.</p>
         {/if}
@@ -199,7 +270,7 @@
 
   <PlanPickerSheet bind:open={planning} {recipe} />
   <RecipePdfSheet bind:open={exporting} {recipe} {portions} />
-  <ChoiceSheet
+  <IngredientSheet
     bind:open={choosing}
     row={choiceRow}
     {factor}
@@ -310,8 +381,74 @@
 
   .ingredients li {
     position: relative;
-    padding: 11px 0 11px 18px;
     line-height: 1.4;
+  }
+
+  .ingredients .line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 11px 0 11px 18px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+
+  .ingredients .line:active {
+    background: var(--surface-2);
+  }
+
+  .line-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .line-sub {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 0.8125rem;
+  }
+
+  .status {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+  }
+
+  .status.unlinked {
+    background: var(--tomato);
+    color: #fff;
+  }
+
+  .status.incomplete {
+    background: var(--mustard-soft);
+    color: var(--mustard);
+    box-shadow: inset 0 0 0 1.5px var(--mustard);
+  }
+
+  .status.small {
+    display: inline-grid;
+    width: 18px;
+    height: 18px;
+    vertical-align: -4px;
+  }
+
+  .signs-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin: 8px 4px 0;
+  }
+
+  .key {
+    white-space: nowrap;
   }
 
   .ingredients li + li {
@@ -341,32 +478,6 @@
 
   strong {
     font-weight: 750;
-  }
-
-  .pick {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    max-width: 100%;
-    margin-top: 6px;
-    padding: 4px 10px;
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    border-radius: 999px;
-    background: var(--accent-soft);
-    color: var(--accent);
-    font: inherit;
-    font-size: 0.8125rem;
-    font-weight: 650;
-  }
-
-  .pick span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .pick :global(svg) {
-    flex: none;
   }
 
   .steps {

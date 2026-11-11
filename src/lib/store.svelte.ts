@@ -93,6 +93,8 @@ export function cleanProduct(raw: Product): Product {
     listMode: raw.listMode === 'check' || raw.listMode === 'skip' ? raw.listMode : 'auto',
     aliases: strings(raw.aliases),
     notFor: Array.isArray(raw.notFor) && raw.notFor.length ? strings(raw.notFor) : undefined,
+    usualFor:
+      Array.isArray(raw.usualFor) && raw.usualFor.length ? strings(raw.usualFor) : undefined,
   };
 }
 
@@ -287,16 +289,21 @@ class Store {
     product.aliases = [...new Set(product.aliases.filter((a) => a && a !== ownName))];
     const notFor = (product.notFor ?? []).filter((n) => !product.aliases.includes(n));
     product.notFor = notFor.length ? [...new Set(notFor)] : undefined;
+    // A usual pick is for a name the product is linked to.
+    const usualFor = (product.usualFor ?? []).filter(
+      (n) => n === ownName || product.aliases.includes(n),
+    );
+    product.usualFor = usualFor.length ? [...new Set(usualFor)] : undefined;
     product.updatedAt = nowISO();
     if (!this.productById.has(product.id)) product.createdAt = product.updatedAt;
 
-    // An ingredient name points to one product only.
+    // Several products can be linked to one name, but only one is its usual pick.
     const changed: Product[] = [product];
     for (const other of this.products) {
-      if (other.id === product.id) continue;
-      const kept = other.aliases.filter((a) => !product.aliases.includes(a));
-      if (kept.length !== other.aliases.length) {
-        other.aliases = kept;
+      if (other.id === product.id || !other.usualFor) continue;
+      const kept = other.usualFor.filter((n) => !product.usualFor?.includes(n));
+      if (kept.length !== other.usualFor.length) {
+        other.usualFor = kept.length ? kept : undefined;
         changed.push(plain(other));
       }
     }
@@ -326,19 +333,31 @@ class Store {
     };
   }
 
-  /** Remembers that an ingredient name means this product. */
-  async linkName(productId: string, ingredientName: string) {
+  /**
+   * Remembers that an ingredient name can mean this product. With `usual`, it
+   * also becomes the product recipes use for that name unless they picked another.
+   */
+  async linkName(productId: string, ingredientName: string, { usual = false } = {}) {
     const product = this.productById.get(productId);
-    const alias = normalizeName(ingredientName);
-    if (
-      !product ||
-      !alias ||
-      alias === normalizeName(product.name) ||
-      product.aliases.includes(alias)
-    ) {
-      return;
-    }
-    await this.saveProduct({ ...plain(product), aliases: [...product.aliases, alias] });
+    const name = normalizeName(ingredientName);
+    if (!product || !name) return;
+    const own = name === normalizeName(product.name);
+    const linked = own || product.aliases.includes(name);
+    const isUsual = !!product.usualFor?.includes(name);
+    if (linked && (isUsual || !usual)) return;
+    await this.saveProduct({
+      ...plain(product),
+      aliases: linked ? product.aliases : [...product.aliases, name],
+      notFor: product.notFor?.filter((n) => n !== name),
+      usualFor: usual && !isUsual ? [...(product.usualFor ?? []), name] : product.usualFor,
+    });
+  }
+
+  /** Makes a product the usual pick for an ingredient name, in recipes that haven't picked one. */
+  async setUsual(productId: string, ingredientName: string) {
+    await this.linkName(productId, ingredientName, { usual: true });
+    const product = this.productById.get(productId);
+    if (product) showToast(`${product.name} is now the usual pick for “${ingredientName.trim()}”`);
   }
 
   /** Stops a product being offered for an ingredient name that its name happens to contain. */
@@ -354,15 +373,24 @@ class Store {
   }
 
   /**
-   * Picking a product that only matched by the words in its name makes it the
-   * default for that name in every recipe, if no product matched it exactly.
-   * Returns true when it did.
+   * Learns from a pick on a recipe or meal. A product picked from the whole
+   * list, not one of the options, is linked to the name so it's offered in
+   * every recipe. When no product matched the name exactly before, the pick
+   * also becomes the usual one for that name. Returns true when it did.
    */
   async learnPick(row: IngredientRow, option: Option): Promise<boolean> {
-    if (!option.product || option.exact) return false;
-    if (row.options.some((o) => o.exact && o.line.text === option.line.text)) return false;
-    await this.linkName(option.product.id, option.line.name);
-    showToast(`${option.product.name} is now the usual pick for “${option.line.name}”`);
+    const product = option.product;
+    if (!product) return false;
+    const offered = row.options.some((o) => o.key === option.key);
+    if (offered && option.exact) return false;
+    const settled = row.options.some((o) => o.exact && o.line.text === option.line.text);
+    if (offered && settled) return false;
+    await this.linkName(product.id, option.line.name, { usual: !settled });
+    if (settled) {
+      showToast(`${product.name} is now offered for “${option.line.name}” in every recipe`);
+      return false;
+    }
+    showToast(`${product.name} is now the usual pick for “${option.line.name}”`);
     return true;
   }
 

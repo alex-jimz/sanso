@@ -14,7 +14,7 @@
   import { store } from '../lib/store.svelte';
   import type { Meal, Recipe, Slot } from '../lib/types';
   import { showToast } from '../lib/ui.svelte';
-  import ChoiceSheet from './ChoiceSheet.svelte';
+  import IngredientSheet from './IngredientSheet.svelte';
   import RecipePhoto from './RecipePhoto.svelte';
   import RecipePicker from './RecipePicker.svelte';
   import Sheet from './Sheet.svelte';
@@ -235,7 +235,7 @@
   {/if}
 </Sheet>
 
-<ChoiceSheet
+<IngredientSheet
   bind:open={choosing}
   row={choiceRow}
   {factor}

@@ -104,8 +104,13 @@ export interface Product {
   /** Day the price was last read from aldi.ie, YYYY-MM-DD. */
   priceCheckedAt?: string;
   listMode: ListMode;
-  /** Normalised ingredient names that mean this product. */
+  /** Normalised ingredient names linked to this product. Several products can share one. */
   aliases: string[];
+  /**
+   * Names this product is the usual pick for, so recipes that haven't picked
+   * one use it. Each name is the usual pick of one product at most.
+   */
+  usualFor?: string[];
   /** Normalised ingredient names its name contains that don't mean it, as "milk" for Coconut milk. */
   notFor?: string[];
   /** Past, current and upcoming offers, in date order. Older versions stored a single `offer`. */

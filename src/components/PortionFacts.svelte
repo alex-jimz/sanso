@@ -1,6 +1,6 @@
 <script lang="ts">
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
-  import { capitalize } from '../lib/ingredients';
+  import { capitalize, type ParsedLine } from '../lib/ingredients';
   import {
     macroColors,
     macroLabels,
@@ -20,9 +20,17 @@
   import { router } from '../lib/router.svelte';
   import { store } from '../lib/store.svelte';
   import type { Product, Recipe } from '../lib/types';
+  import { afterHistory } from '../lib/ui.svelte';
   import Sheet from './Sheet.svelte';
 
-  let { recipe }: { recipe: Recipe } = $props();
+  let {
+    recipe,
+    onunlinked,
+  }: {
+    recipe: Recipe;
+    /** Opens the product picker for an ingredient with no product. */
+    onunlinked?: (line: ParsedLine) => void;
+  } = $props();
 
   const facts = $derived(store.factsFor(recipe));
   const total = $derived(facts.lines.length);
@@ -51,6 +59,11 @@
   }
 
   function openLine(facts: LineFacts) {
+    if (!facts.product && onunlinked) {
+      // Waits for this sheet's history entry to go before the picker adds its own.
+      afterHistory(() => onunlinked(facts.line));
+      return;
+    }
     open = false;
     if (facts.missing.every((m) => m.kind === 'amount')) router.go(`/recipes/${recipe.id}/edit`);
     else if (facts.product) router.go(`/more/products/${facts.product.id}`);
@@ -121,7 +134,7 @@
   <Sheet bind:open title="What’s missing">
     <div class="stack">
       <p class="hint">
-        Tap an ingredient to fill in its product. Cost uses regular prices, not offers.
+        Tap an ingredient to pick or fill in its product. Cost uses regular prices, not offers.
       </p>
       <ul class="list">
         {#each gaps as gap, i (i)}

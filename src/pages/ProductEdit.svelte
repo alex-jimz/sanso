@@ -221,7 +221,7 @@
     const found = new Set<string>();
     for (const line of recipeLines) {
       const n = normalizeName(line.name);
-      if (n && n !== own && !aliases.includes(n) && !notFor.includes(n) && wordMatch(n, own))
+      if (n && n !== own && !aliases.includes(n) && !notFor.includes(n) && wordMatch(n, own, true))
         found.add(n);
     }
     return [...found].sort();
