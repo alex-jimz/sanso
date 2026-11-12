@@ -32,7 +32,7 @@
 
   function cancel() {
     ui.pendingPhoto = null;
-    router.go('/more/products', { replace: true });
+    router.go('/products', { replace: true });
   }
 </script>
 
@@ -66,7 +66,7 @@
         <button
           class="btn btn-outline"
           type="button"
-          onclick={() => open(`/more/products/new?name=${encodeURIComponent(query.trim())}`)}
+          onclick={() => open(`/products/new?name=${encodeURIComponent(query.trim())}`)}
         >
           <Plus size={18} /> New product “{query.trim()}”
         </button>
@@ -74,7 +74,7 @@
       <ul class="list">
         {#each matches as p (p.id)}
           <li>
-            <button class="row" type="button" onclick={() => open(`/more/products/${p.id}`)}>
+            <button class="row" type="button" onclick={() => open(`/products/${p.id}`)}>
               <ProductPhoto url={p.imageUrl} photoId={p.photoId} size={36} />
               <span class="row-main"><span class="row-title">{p.name}</span></span>
             </button>

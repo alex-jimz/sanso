@@ -1,12 +1,14 @@
 <script lang="ts">
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import CookingPot from '@lucide/svelte/icons/cooking-pot';
   import Plus from '@lucide/svelte/icons/plus';
   import ShoppingBasket from '@lucide/svelte/icons/shopping-basket';
   import UtensilsCrossed from '@lucide/svelte/icons/utensils-crossed';
   import MealSheet from '../components/MealSheet.svelte';
   import RecipePhoto from '../components/RecipePhoto.svelte';
   import StatePill from '../components/StatePill.svelte';
+  import { mealsToCook } from '../lib/cooking';
   import {
     addDays,
     formatWeekRange,
@@ -39,6 +41,15 @@
         !store.list?.mealIds.includes(m.id),
     ).length,
   );
+
+  const toCook = $derived(mealsToCook(store.meals, store.recipeById, today));
+  const cookText = $derived.by(() => {
+    if (store.cooking) return 'Back to the recipes you’re cooking';
+    const next = toCook.find((m) => m.date >= today);
+    const title = next?.recipeId ? store.recipeById.get(next.recipeId)?.title : undefined;
+    if (next?.date === today && title) return `${slotLabel[next.slot]}: ${title}`;
+    return toCook.length === 1 ? '1 meal to cook' : `${toCook.length} meals to cook`;
+  });
 
   function openSlot(date: string, slot: Slot) {
     selected = { date, slot };
@@ -81,6 +92,17 @@
       </button>
     </div>
   </header>
+
+  {#if store.cooking || toCook.length}
+    <button class="shop-banner cook-banner" type="button" onclick={() => router.go('/plan/cook')}>
+      <span class="banner-icon"><CookingPot size={20} /></span>
+      <span class="row-main">
+        <span class="row-title">{store.cooking ? 'Cooking now' : 'Cook'}</span>
+        <span class="row-sub">{cookText}</span>
+      </span>
+      <ChevronRight size={20} />
+    </button>
+  {/if}
 
   {#if toShop > 0}
     <button class="shop-banner" type="button" onclick={() => router.go('/shopping?pick=1')}>
@@ -167,6 +189,19 @@
 
   .shop-banner .row-sub {
     color: #7c5d1c;
+  }
+
+  .cook-banner {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .cook-banner .row-sub {
+    color: var(--muted);
+  }
+
+  .cook-banner .banner-icon {
+    color: var(--accent);
   }
 
   .banner-icon {

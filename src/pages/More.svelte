@@ -2,19 +2,15 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import CloudUpload from '@lucide/svelte/icons/cloud-upload';
   import FileText from '@lucide/svelte/icons/file-text';
-  import Package from '@lucide/svelte/icons/package';
   import Store from '@lucide/svelte/icons/store';
   import Stepper from '../components/Stepper.svelte';
   import { backupConfigured, backupStatus, hasUnsavedChanges } from '../lib/backup.svelte';
-  import { timeAgo, todayISO } from '../lib/dates';
+  import { timeAgo } from '../lib/dates';
   import { applyUpdate, checkForUpdate, pwa } from '../lib/pwa.svelte';
   import { router } from '../lib/router.svelte';
-  import { activeOffer } from '../lib/shopping';
   import { store } from '../lib/store.svelte';
   import { showToast } from '../lib/ui.svelte';
 
-  const today = todayISO();
-  const offers = $derived(store.products.filter((p) => activeOffer(p, today)).length);
   let portions = $state(store.settings.defaultPortions);
 
   const backupText = $derived.by(() => {
@@ -43,20 +39,6 @@
   <header class="page-header"><h1 class="page-title">More</h1></header>
 
   <ul class="list">
-    <li>
-      <a class="row" href="#/more/products" onclick={(e) => open(e, '/more/products')}>
-        <span class="icon"><Package size={20} /></span>
-        <span class="row-main">
-          <span class="row-title">Products</span>
-          <span class="row-sub">
-            {store.products.length === 1 ? '1 product' : `${store.products.length} products`}{offers
-              ? ` · ${offers} on offer`
-              : ''}
-          </span>
-        </span>
-        <ChevronRight size={20} class="chev" />
-      </a>
-    </li>
     <li>
       <a class="row" href="#/more/sections" onclick={(e) => open(e, '/more/sections')}>
         <span class="icon"><Store size={20} /></span>

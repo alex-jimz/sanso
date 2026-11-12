@@ -83,6 +83,7 @@ export function cleanProduct(raw: Product): Product {
     offers: cleanOffers(raw as Product & { offer?: unknown }),
     priceLog: cleanPriceLog(raw.priceLog),
     nutrition: cleanNutrition(raw.nutrition),
+    nutritionPer: raw.nutritionPer === 'piece' ? 'piece' : undefined,
     negligible: raw.negligible === true ? true : undefined,
     weights: cleanWeights(raw.weights),
     breakdown: cleanBreakdown(raw.breakdown, raw.id),

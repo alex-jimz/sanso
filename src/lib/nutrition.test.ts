@@ -157,6 +157,48 @@ describe('recipeFacts', () => {
   });
 });
 
+describe('nutrition per piece', () => {
+  const cubes = product('Chicken stock cubes', {
+    nutrition: { kcal: 20, protein: 0.5, fat: 1.2, carbs: 1.8 },
+    nutritionPer: 'piece',
+    packSize: 12,
+    packUnit: 'pcs',
+    price: 0.6,
+  });
+
+  it('multiplies by the pieces a line uses, with no piece weight', () => {
+    const facts = lineFacts(line('2 stock cubes'), cubes);
+    expect(facts.missing).toEqual([]);
+    expect(facts.nutrition).toEqual({ kcal: 40, protein: 1, fat: 2.4, carbs: 3.6 });
+    expect(facts.cost).toBeCloseTo(0.1);
+  });
+
+  it('needs a piece weight for weighed lines, and uses it', () => {
+    expect(lineFacts(line('20 g stock cube'), cubes).missing).toEqual([
+      { kind: 'weight', unit: 'piece' },
+    ]);
+    const weighed = { ...cubes, weights: { piece: 10 } };
+    expect(lineFacts(line('20 g stock cube'), weighed).nutrition?.kcal).toBeCloseTo(40);
+  });
+
+  it('asks the form for a piece weight only when something uses grams', () => {
+    expect(weightsNeeded(cubes, [line('2 stock cubes')])).toEqual([]);
+    expect(weightsNeeded(cubes, [line('20 g stock cube')])).toEqual([
+      { key: 'piece', example: '20 g stock cube' },
+    ]);
+    // A box sold by weight needs grams to price "2 stock cubes".
+    const byWeight = { ...cubes, packSize: 120, packUnit: 'g' as const };
+    expect(weightsNeeded(byWeight, [line('2 stock cubes')])).toEqual([
+      { key: 'piece', example: '2 stock cubes' },
+    ]);
+    // Per 100 g, a count still needs the weight of one piece.
+    const per100 = { ...cubes, nutritionPer: undefined };
+    expect(weightsNeeded(per100, [line('2 stock cubes')])).toEqual([
+      { key: 'piece', example: '2 stock cubes' },
+    ]);
+  });
+});
+
 describe('weightsNeeded', () => {
   it('asks for the units recipes use that have no weight', () => {
     const lines = ['3 garlic cloves', '1 bulb garlic', '20 g garlic', 'garlic'].map(line);

@@ -95,12 +95,12 @@
     open = false;
     await onpick(option);
     // A new product has nothing filled in yet.
-    if (created) router.go(`/more/products/${product.id}`);
+    if (created) router.go(`/products/${product.id}`);
   }
 
   function fillIn(product: Product) {
     open = false;
-    router.go(`/more/products/${product.id}`);
+    router.go(`/products/${product.id}`);
   }
 
   async function makeUsual() {

@@ -10,8 +10,15 @@ export interface Route {
   query: URLSearchParams;
 }
 
+/** Pages that moved: Products got its own tab, and Cook moved into Plan. */
+function moved(raw: string): string {
+  return raw
+    .replace(/^\/more\/products(?=[/?]|$)/, '/products')
+    .replace(/^\/cook(?=[/?]|$)/, '/plan/cook');
+}
+
 function parse(hash: string): Route {
-  const raw = hash.replace(/^#/, '') || '/recipes';
+  const raw = moved(hash.replace(/^#/, '') || '/recipes');
   const [path = '/recipes', query = ''] = raw.split('?');
   return { path, segments: path.split('/').filter(Boolean), query: new URLSearchParams(query) };
 }
@@ -21,6 +28,7 @@ class Router {
   private depth = Number(history.state?.depth ?? 0);
 
   constructor() {
+    this.fixMoved();
     // Reads the current entry rather than the event's: a page opened while a
     // sheet's entry was being removed may already have been pushed on top.
     window.addEventListener('popstate', () => {
@@ -30,7 +38,14 @@ class Router {
     window.addEventListener('hashchange', () => this.update());
   }
 
+  /** Rewrites an address from before a page moved, such as one left open across an update. */
+  private fixMoved() {
+    const raw = location.hash.replace(/^#/, '');
+    if (raw && moved(raw) !== raw) history.replaceState(history.state, '', `#${moved(raw)}`);
+  }
+
   private update() {
+    this.fixMoved();
     const next = parse(location.hash);
     if (next.path !== this.route.path || next.query.toString() !== this.route.query.toString()) {
       this.route = next;

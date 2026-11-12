@@ -1,6 +1,7 @@
 // Calories, macros and cost per portion of a recipe, worked out from the
 // products its ingredients link to. Products store nutrition per 100 g (or
-// 100 ml), and grams per piece, clove or spoon for lines that aren't weighed.
+// 100 ml), or per piece for things used by the piece like stock cubes, and
+// grams per piece, clove or spoon for lines that aren't weighed.
 // A line that can't be worked out is listed with what's missing, so a total
 // can show how many ingredients it covers.
 
@@ -115,7 +116,7 @@ export function lineAmount(
 export interface LineFacts {
   line: ParsedLine;
   product?: Product;
-  /** Per 100 g of `grams`, scaled. Set when the line counts towards nutrition. */
+  /** For the amount the line uses. Set when the line counts towards nutrition. */
   nutrition?: Totals;
   /** Euro. Set when the line counts towards cost. */
   cost?: number;
@@ -145,14 +146,19 @@ export function lineFacts(line: ParsedLine, product: Product | undefined): LineF
   if (!amount) addMissing(missing, { kind: 'amount' });
 
   let nutrition: Totals | undefined;
-  const per100 = product.nutrition;
-  if (!hasNutrition(per100)) addMissing(missing, { kind: 'nutrition' });
-  if (amount && amount.grams === undefined && amount.needs)
+  const values = product.nutrition;
+  const perPiece = product.nutritionPer === 'piece';
+  if (!hasNutrition(values)) addMissing(missing, { kind: 'nutrition' });
+  // Per-piece values need a count of pieces, and others need grams.
+  if (perPiece && amount && amount.pieces === undefined)
+    addMissing(missing, { kind: 'weight', unit: amount.needs ?? 'piece' });
+  else if (!perPiece && amount && amount.grams === undefined && amount.needs)
     addMissing(missing, { kind: 'weight', unit: amount.needs });
-  if (hasNutrition(per100) && amount?.grams !== undefined) {
-    const grams = amount.grams;
+  const used = perPiece ? amount?.pieces : amount?.grams;
+  if (hasNutrition(values) && used !== undefined) {
+    const scale = perPiece ? used : used / 100;
     nutrition = zero();
-    for (const key of nutrientKeys) nutrition[key] = (per100[key] * grams) / 100;
+    for (const key of nutrientKeys) nutrition[key] = values[key] * scale;
   }
 
   let cost: number | undefined;
@@ -232,23 +238,28 @@ export interface WeightNeed {
  * that can't be turned into grams otherwise, plus any weight already set.
  */
 export function weightsNeeded(
-  product: Pick<Product, 'weights' | 'packSize' | 'packUnit'>,
+  product: Pick<Product, 'weights' | 'packSize' | 'packUnit' | 'nutritionPer'>,
   lines: ParsedLine[],
 ): WeightNeed[] {
   const needs = new Map<string, WeightNeed>();
   for (const key of Object.keys(product.weights ?? {})) needs.set(key, { key });
   const bare = { ...product, weights: undefined };
+  const counted = product.packUnit === 'pcs' || product.nutritionPer === 'piece';
+  // Per-piece nutrition needs grams only to price a pack sold by weight.
+  const gramsUsed =
+    product.nutritionPer !== 'piece' || (!!product.packSize && product.packUnit !== 'pcs');
   for (const line of lines) {
     if (line.quantity === undefined) continue;
     const amount = lineAmount(line.quantity, line.unit, bare);
     const key = amount.needs;
-    if (!key) continue;
+    // Plain counts like "2 stock cubes" need no grams when nothing uses them.
+    if (!key || (!gramsUsed && key === 'piece' && amount.pieces !== undefined)) continue;
     const known = needs.get(key);
     if (!known) needs.set(key, { key, example: line.text });
     else if (!known.example) known.example = line.text;
   }
-  // Products sold by the piece need a piece weight to price weighed lines.
-  if (product.packUnit === 'pcs' && !needs.has('piece')) {
+  // Products sold or counted by the piece need a piece weight for weighed lines.
+  if (counted && !needs.has('piece')) {
     const weighed = lines.find(
       (l) => l.quantity !== undefined && lineAmount(l.quantity, l.unit, bare).pieces === undefined,
     );

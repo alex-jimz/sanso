@@ -82,6 +82,11 @@ describe('fillFrom', () => {
     expect(applyFill({ nutrition: own }, fill).nutrition).toBe(own);
   });
 
+  it('switches values per piece back to per 100 g when it fills them', () => {
+    const fill = fillFrom(food('Onion'), { nutrition: { kcal: 44 } });
+    expect(applyFill({ nutritionPer: 'piece' as const }, fill).nutritionPer).toBeUndefined();
+  });
+
   it('has nothing to add when everything is set', () => {
     const fill = fillFrom(food('Kale'), { nutrition: { kcal: 1, protein: 1, fat: 1, carbs: 1 } });
     expect(isEmptyFill(fill)).toBe(true);

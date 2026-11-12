@@ -1,10 +1,12 @@
 <script lang="ts">
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Check from '@lucide/svelte/icons/check';
   import CookingPot from '@lucide/svelte/icons/cooking-pot';
   import Sun from '@lucide/svelte/icons/sun';
   import { onMount } from 'svelte';
   import RecipePhoto from '../components/RecipePhoto.svelte';
   import StatePill from '../components/StatePill.svelte';
+  import { mealsToCook } from '../lib/cooking';
   import { addDays, formatDayMonth, relativeDay, todayISO } from '../lib/dates';
   import { choiceSignature, chosenLines } from '../lib/choices';
   import { displayParts, type ParsedLine } from '../lib/ingredients';
@@ -16,21 +18,7 @@
   import { keepScreenOn } from '../lib/wakeLock';
 
   const today = todayISO();
-  const order = (m: Meal) => `${m.date}-${m.slot === 'lunch' ? 0 : 1}`;
-
-  const candidates = $derived(
-    store.meals
-      .filter(
-        (m) =>
-          m.recipeId &&
-          store.recipeById.has(m.recipeId) &&
-          m.state !== 'cooked' &&
-          m.state !== 'noCooking' &&
-          m.date >= addDays(today, -1) &&
-          m.date <= addDays(today, 6),
-      )
-      .sort((a, b) => order(a).localeCompare(order(b))),
-  );
+  const candidates = $derived(mealsToCook(store.meals, store.recipeById, today));
   const days = $derived([...new Set(candidates.map((m) => m.date))]);
 
   let chosen = $state<string[]>([]);
@@ -122,13 +110,20 @@
 </script>
 
 <div class="page with-action">
+  <div class="top-bar">
+    <button class="icon-btn" type="button" aria-label="Back" onclick={() => router.back('/plan')}>
+      <ArrowLeft size={22} />
+    </button>
+    <h1 class="top-bar-title">{store.cooking ? 'Cooking' : 'Cook'}</h1>
+    {#if store.cooking}
+      <button class="btn btn-outline btn-small" type="button" onclick={stop}>Stop</button>
+    {:else}
+      <span class="top-bar-spacer"></span>
+    {/if}
+  </div>
+
   {#if !store.cooking}
-    <header class="page-header">
-      <div>
-        <h1 class="page-title">Cook</h1>
-        <p class="page-subtitle">What are you cooking?</p>
-      </div>
-    </header>
+    <p class="lead">What are you cooking?</p>
 
     {#if candidates.length}
       <div class="stack">
@@ -173,24 +168,15 @@
         <div class="empty-icon"><CookingPot size={34} strokeWidth={1.7} /></div>
         <h2>Nothing to cook yet</h2>
         <p>Meals you plan for the coming days show up here, ready to cook.</p>
-        <button
-          class="btn btn-primary"
-          type="button"
-          onclick={() => router.go('/plan', { replace: true })}>Plan meals</button
+        <button class="btn btn-primary" type="button" onclick={() => router.back('/plan')}
+          >Plan meals</button
         >
       </div>
     {/if}
   {:else}
-    <header class="page-header">
-      <div>
-        <h1 class="page-title">Cooking</h1>
-        <p class="page-subtitle screen">
-          {#if screenOn}<Sun size={15} /> The screen stays on{:else}Tap ingredients and steps as you
-            go{/if}
-        </p>
-      </div>
-      <button class="btn btn-outline btn-small" type="button" onclick={stop}>Stop</button>
-    </header>
+    <p class="lead screen">
+      {#if screenOn}<Sun size={15} /> The screen stays on{:else}Tap ingredients and steps as you go{/if}
+    </p>
 
     <div class="stack">
       {#each dishes as dish (dish.key)}
@@ -268,7 +254,7 @@
   {/if}
 </div>
 
-<div class="action-bar with-tabs">
+<div class="action-bar">
   {#if store.cooking}
     <button class="btn btn-primary" type="button" onclick={finish}
       ><Check size={20} /> Done cooking</button
@@ -289,6 +275,16 @@
 </div>
 
 <style>
+  .top-bar-spacer {
+    width: 42px;
+    flex: none;
+  }
+
+  .lead {
+    margin: 4px 4px 16px;
+    color: var(--muted);
+  }
+
   .day {
     margin: 0 0 8px 4px;
   }

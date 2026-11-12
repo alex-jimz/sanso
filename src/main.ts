@@ -42,11 +42,11 @@ async function openShared() {
     (p) => (!!shared.url && p.url === shared.url) || (!!shared.sku && p.sku === shared.sku),
   );
   if (known) {
-    router.go(`/more/products/${known.id}`);
+    router.go(`/products/${known.id}`);
     showToast('You already have this product. Update its price or offer here.');
   } else {
     ui.shared = shared;
-    router.go('/more/products/new');
+    router.go('/products/new');
   }
 }
 

@@ -1,8 +1,8 @@
 <script lang="ts">
   import BookOpen from '@lucide/svelte/icons/book-open';
   import CalendarDays from '@lucide/svelte/icons/calendar-days';
-  import CookingPot from '@lucide/svelte/icons/cooking-pot';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import Package from '@lucide/svelte/icons/package';
   import ShoppingBasket from '@lucide/svelte/icons/shopping-basket';
   import { router } from '../lib/router.svelte';
   import { store } from '../lib/store.svelte';
@@ -11,7 +11,7 @@
     { path: '/recipes', label: 'Recipes', icon: BookOpen },
     { path: '/plan', label: 'Plan', icon: CalendarDays },
     { path: '/shopping', label: 'Shopping', icon: ShoppingBasket },
-    { path: '/cook', label: 'Cook', icon: CookingPot },
+    { path: '/products', label: 'Products', icon: Package },
     { path: '/more', label: 'More', icon: Ellipsis },
   ];
 
@@ -38,7 +38,7 @@
         <Icon size={23} strokeWidth={active ? 2.25 : 1.9} />
         {#if tab.path === '/shopping' && toBuy > 0}
           <span class="badge" aria-label={`${toBuy} to buy`}>{toBuy > 99 ? '99+' : toBuy}</span>
-        {:else if tab.path === '/cook' && store.cooking}
+        {:else if tab.path === '/plan' && store.cooking}
           <span class="dot" aria-label="Cooking in progress"></span>
         {/if}
       </span>

@@ -200,7 +200,7 @@
             <button
               class="btn btn-outline btn-small"
               type="button"
-              onclick={() => router.go(`/more/products/${product.id}`)}
+              onclick={() => router.go(`/products/${product.id}`)}
             >
               <Pencil size={16} /> Pack size, price, offer
             </button>

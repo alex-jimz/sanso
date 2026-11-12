@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Leaf from '@lucide/svelte/icons/leaf';
   import Package from '@lucide/svelte/icons/package';
   import Plus from '@lucide/svelte/icons/plus';
@@ -34,6 +33,7 @@
   ];
 
   const today = todayISO();
+  const onOffer = $derived(store.products.filter((p) => activeOffer(p, today)).length);
   let query = $state('');
   let filter = $state<Filter>('all');
   /** Which missing detail to show under "Missing info", or any. */
@@ -112,20 +112,24 @@
 </script>
 
 <div class="page">
-  <div class="top-bar">
-    <button class="icon-btn" type="button" aria-label="Back" onclick={() => router.back('/more')}>
-      <ArrowLeft size={22} />
-    </button>
-    <h1 class="top-bar-title">Products</h1>
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Products</h1>
+      <p class="page-subtitle">
+        {store.products.length === 1 ? '1 product' : `${store.products.length} products`}{onOffer
+          ? ` · ${onOffer} on offer`
+          : ''}
+      </p>
+    </div>
     <button
-      class="icon-btn"
+      class="icon-btn filled"
       type="button"
       aria-label="New product"
-      onclick={() => router.go('/more/products/new')}
+      onclick={() => router.go('/products/new')}
     >
       <Plus size={22} />
     </button>
-  </div>
+  </header>
 
   {#if !store.products.length}
     <div class="empty">
@@ -135,7 +139,7 @@
         Products are the things you buy. They appear as you sort shopping list items into shop
         sections, or you can add them from aldi.ie with their prices and photos.
       </p>
-      <button class="btn btn-primary" type="button" onclick={() => router.go('/more/products/new')}>
+      <button class="btn btn-primary" type="button" onclick={() => router.go('/products/new')}>
         <Plus size={20} /> Add a product
       </button>
       <button class="btn btn-outline" type="button" onclick={() => router.go('/more/aldi')}>
@@ -215,8 +219,8 @@
             <li>
               <a
                 class="row"
-                href={`#/more/products/${product.id}`}
-                onclick={(e) => open(e, `/more/products/${product.id}`)}
+                href={`#/products/${product.id}`}
+                onclick={(e) => open(e, `/products/${product.id}`)}
               >
                 <ProductPhoto url={product.imageUrl} photoId={product.photoId} />
                 <span class="row-main">

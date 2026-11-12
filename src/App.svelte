@@ -49,15 +49,15 @@
       <RecipeEdit id={second} />
     {:else if top === 'recipes' && second}
       <RecipeDetail id={second} />
+    {:else if top === 'plan' && second === 'cook'}
+      <Cook />
     {:else if top === 'plan'}
       <Plan />
     {:else if top === 'shopping'}
       <Shopping />
-    {:else if top === 'cook'}
-      <Cook />
-    {:else if top === 'more' && second === 'products' && third}
-      <ProductEdit id={third} />
-    {:else if top === 'more' && second === 'products'}
+    {:else if top === 'products' && second}
+      <ProductEdit id={second} />
+    {:else if top === 'products'}
       <Products />
     {:else if top === 'more' && second === 'sections'}
       <Sections />

@@ -57,7 +57,7 @@
       const { item } = fresh[0]!;
       ui.shared = { name: item.name, ...newProductFields(item, today), shop: 'aldi' };
       ui.aldiRaw = raw ?? '';
-      router.go('/more/products/new', { replace: true });
+      router.go('/products/new', { replace: true });
     } else if (raw !== null) {
       router.go('/aldi', { replace: true });
     }
@@ -104,7 +104,7 @@
       added ? `added ${added} (give ${added === 1 ? 'it' : 'them'} a shop section)` : '',
     ].filter(Boolean);
     showToast(parts.join(', ').replace(/^a/, 'A') || 'Nothing to save');
-    router.go('/more/products', { replace: true });
+    router.go('/products', { replace: true });
   }
 
   async function copyRaw() {
@@ -123,7 +123,7 @@
       class="icon-btn"
       type="button"
       aria-label="Close"
-      onclick={() => router.back('/more/products')}
+      onclick={() => router.back('/products')}
     >
       <X size={22} />
     </button>
