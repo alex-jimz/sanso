@@ -13,7 +13,7 @@
 // then asks for the user's own.
 //
 // Carbs are USDA's "carbohydrate, by difference" minus fibre, to match EU
-// labels, which leave fibre out.
+// labels, which leave fibre out. Sugar is USDA's "Sugars, Total".
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -440,7 +440,14 @@ async function table(file) {
     .map((r) => Object.fromEntries(header.map((h, i) => [h, r[i]])));
 }
 
-const nutrientIds = { kcal: '1008', protein: '1003', fat: '1004', carbs: '1005', fibre: '1079' };
+const nutrientIds = {
+  kcal: '1008',
+  protein: '1003',
+  fat: '1004',
+  carbs: '1005',
+  fibre: '1079',
+  sugar: '2000',
+};
 
 const byDescription = new Map((await table('food.csv')).map((f) => [f.description, f.fdc_id]));
 const wanted = new Set(foods.map((f) => byDescription.get(f.usda)).filter(Boolean));
@@ -460,6 +467,7 @@ for (const p of await table('food_portion.csv')) {
 
 const round1 = (n) => Math.round(n * 10) / 10;
 const problems = [];
+const noSugar = [];
 const out = foods.map((food) => {
   const fdcId = byDescription.get(food.usda);
   if (!fdcId) {
@@ -481,6 +489,13 @@ const out = foods.map((food) => {
     }
     weights[key] = round1(Number(portion.gram_weight) / Number(portion.amount || 1));
   }
+  const carbs = round1(Math.max(0, n.carbs - (n.fibre ?? 0)));
+  // USDA leaves sugar out for many foods with no carbs, like meat and oil, where it's zero.
+  // Sugar is part of carbs, so it's capped at them. A few foods, like yellow
+  // pepper and mint, have carbs but no sugar measured, and stay without.
+  const sugar =
+    n.sugar !== undefined ? Math.min(carbs, round1(n.sugar)) : carbs === 0 ? 0 : undefined;
+  if (sugar === undefined) noSugar.push(food.name);
   return {
     name: food.name,
     aliases: food.aliases ?? [],
@@ -489,7 +504,8 @@ const out = foods.map((food) => {
     kcal: Math.round(n.kcal),
     protein: round1(n.protein),
     fat: round1(n.fat),
-    carbs: round1(Math.max(0, n.carbs - (n.fibre ?? 0))),
+    carbs,
+    sugar,
     ...(Object.keys(weights).length ? { weights } : {}),
   };
 });
@@ -511,3 +527,4 @@ await writeFile(
   ) + '\n',
 );
 console.log(`${out.length} foods written to ${file}`);
+if (noSugar.length) console.log(`No sugar in USDA's data for: ${noSugar.join(', ')}`);

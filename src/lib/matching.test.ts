@@ -135,7 +135,7 @@ describe('lineStatus', () => {
     price: 2,
     packSize: 1000,
     packUnit: 'g',
-    nutrition: { kcal: 350, protein: 8, fat: 1, carbs: 77 },
+    nutrition: { kcal: 350, protein: 8, fat: 1, carbs: 77, sugar: 0.1 },
   });
   const rowFor = (line: string, products: Product[]) =>
     ingredientRows([line], productResolver(products))[0] as IngredientRow;
@@ -148,6 +148,14 @@ describe('lineStatus', () => {
     expect(lineStatus(facts)).toBe('incomplete');
     expect(needsText(facts!.missing)).toBe('Needs nutrition and price');
     expect(lineStatus(optionFacts(rowFor('200 ml water', []).chosen))).toBe('skip');
+  });
+
+  it('marks a line whose product has everything but sugar, without calling it incomplete', () => {
+    const noSugar = { ...full, nutrition: { kcal: 350, protein: 8, fat: 1, carbs: 77 } };
+    const facts = optionFacts(rowFor('300 g rice', [noSugar]).chosen);
+    expect(facts?.missing).toEqual([]);
+    expect(lineStatus(facts)).toBe('noSugar');
+    expect(needsText(facts!.missing)).toBe('');
   });
 
   it('names the weight a line needs', () => {

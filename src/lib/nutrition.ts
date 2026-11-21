@@ -11,9 +11,14 @@ import type { Resolver } from './matching';
 import type { Nutrition, Product, Recipe } from './types';
 import { getUnit } from './units';
 
+/** The four values a product needs to count towards calories. Sugar is extra. */
 export const nutrientKeys = ['kcal', 'protein', 'fat', 'carbs'] as const;
 export type NutrientKey = (typeof nutrientKeys)[number];
 export type Totals = Record<NutrientKey, number>;
+/** Nutrition with the four values set, and sugar if known. */
+export type FullNutrition = Totals & { sugar?: number };
+/** Every value a product can store. */
+export const storedKeys = [...nutrientKeys, 'sugar'] as const;
 
 export const nutrientLabels: Record<NutrientKey, string> = {
   kcal: 'Calories',
@@ -21,6 +26,7 @@ export const nutrientLabels: Record<NutrientKey, string> = {
   fat: 'Fat',
   carbs: 'Carbs',
 };
+export const sugarLabel = 'Sugar';
 
 /** Recipe units that mean "one of the product's packs" when no weight is set for them. */
 const containerUnits = new Set(['pack', 'tin', 'jar', 'bag', 'tub', 'bottle', 'carton', 'sachet']);
@@ -45,7 +51,7 @@ export function cleanNutrition(raw: unknown): Nutrition | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
   const source = raw as Record<string, unknown>;
   const out: Nutrition = {};
-  for (const key of nutrientKeys) {
+  for (const key of storedKeys) {
     const value = nonNegative(source[key]);
     if (value !== undefined) out[key] = value;
   }
@@ -62,8 +68,15 @@ export function cleanWeights(raw: unknown): Record<string, number> | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
-export function hasNutrition(n: Nutrition | undefined): n is Required<Nutrition> {
+export function hasNutrition(n: Nutrition | undefined): n is FullNutrition {
   return !!n && nutrientKeys.every((key) => n[key] !== undefined);
+}
+
+/** True when the four values are there but sugar isn't: complete enough, but not quite. */
+export function lacksSugar(product: Pick<Product, 'nutrition' | 'negligible'>): boolean {
+  return (
+    !product.negligible && hasNutrition(product.nutrition) && product.nutrition.sugar === undefined
+  );
 }
 
 export type Missing =
@@ -118,6 +131,10 @@ export interface LineFacts {
   product?: Product;
   /** For the amount the line uses. Set when the line counts towards nutrition. */
   nutrition?: Totals;
+  /** Grams of sugar for the amount the line uses, when the product has a sugar value. */
+  sugar?: number;
+  /** The line counts towards calories, but its product has no sugar value. */
+  noSugar?: boolean;
   /** Euro. Set when the line counts towards cost. */
   cost?: number;
   /** What stops the line from counting, for nutrition, cost or both. */
@@ -138,7 +155,8 @@ function addMissing(list: Missing[], item: Missing) {
 /** Works out one ingredient line, using the regular price rather than an offer. */
 export function lineFacts(line: ParsedLine, product: Product | undefined): LineFacts {
   if (!product) return { line, missing: [{ kind: 'product' }] };
-  if (product.negligible) return { line, product, nutrition: zero(), cost: 0, missing: [] };
+  if (product.negligible)
+    return { line, product, nutrition: zero(), sugar: 0, cost: 0, missing: [] };
 
   const missing: Missing[] = [];
   const amount =
@@ -146,6 +164,7 @@ export function lineFacts(line: ParsedLine, product: Product | undefined): LineF
   if (!amount) addMissing(missing, { kind: 'amount' });
 
   let nutrition: Totals | undefined;
+  let sugar: number | undefined;
   const values = product.nutrition;
   const perPiece = product.nutritionPer === 'piece';
   if (!hasNutrition(values)) addMissing(missing, { kind: 'nutrition' });
@@ -159,6 +178,7 @@ export function lineFacts(line: ParsedLine, product: Product | undefined): LineF
     const scale = perPiece ? used : used / 100;
     nutrition = zero();
     for (const key of nutrientKeys) nutrition[key] = values[key] * scale;
+    if (values.sugar !== undefined) sugar = values.sugar * scale;
   }
 
   let cost: number | undefined;
@@ -174,7 +194,15 @@ export function lineFacts(line: ParsedLine, product: Product | undefined): LineF
       });
   }
 
-  return { line, product, nutrition, cost, missing };
+  return {
+    line,
+    product,
+    nutrition,
+    sugar,
+    noSugar: hasNutrition(values) && values.sugar === undefined,
+    cost,
+    missing,
+  };
 }
 
 export interface RecipeFacts {
@@ -185,6 +213,10 @@ export interface RecipeFacts {
   /** Lines that count towards nutrition and cost, out of `lines.length`. */
   nutritionCount: number;
   costCount: number;
+  /** Per portion, from the counted lines whose products have a sugar value. */
+  sugar: number;
+  /** Counted lines with a sugar value, out of `nutritionCount`. */
+  sugarCount: number;
 }
 
 /** The ingredient lines that matter, every alternative included: not headings, and not tap water. */
@@ -214,17 +246,23 @@ export function recipeFacts(
   let cost = 0;
   let nutritionCount = 0;
   let costCount = 0;
+  let sugar = 0;
+  let sugarCount = 0;
   for (const facts of lines) {
     if (facts.nutrition) {
       nutritionCount += 1;
       for (const key of nutrientKeys) nutrition[key] += facts.nutrition[key] / portions;
+      if (facts.sugar !== undefined) {
+        sugarCount += 1;
+        sugar += facts.sugar / portions;
+      }
     }
     if (facts.cost !== undefined) {
       costCount += 1;
       cost += facts.cost / portions;
     }
   }
-  return { lines, nutrition, cost, nutritionCount, costCount };
+  return { lines, nutrition, cost, nutritionCount, costCount, sugar, sugarCount };
 }
 
 export interface WeightNeed {

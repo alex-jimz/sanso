@@ -3,15 +3,17 @@
 
 import { normalizeName, type ParsedLine } from './ingredients';
 import type { Resolver } from './matching';
-import { countedLines, hasNutrition, weightsNeeded } from './nutrition';
+import { countedLines, hasNutrition, lacksSugar, weightsNeeded } from './nutrition';
 import type { Product, Recipe } from './types';
 
-export type MissingKind = 'price' | 'pack' | 'nutrition' | 'weights' | 'section' | 'photo';
+export type MissingKind =
+  'price' | 'pack' | 'nutrition' | 'sugar' | 'weights' | 'section' | 'photo';
 
 export const missingKinds: MissingKind[] = [
   'price',
   'pack',
   'nutrition',
+  'sugar',
   'weights',
   'section',
   'photo',
@@ -21,6 +23,7 @@ export const missingLabels: Record<MissingKind, string> = {
   price: 'Price',
   pack: 'Pack size',
   nutrition: 'Nutrition',
+  sugar: 'Sugar',
   weights: 'Weights',
   section: 'Section',
   photo: 'Photo',
@@ -67,6 +70,8 @@ export function missingInfo(product: Product, context: MissingContext): MissingK
   }
   if (counts && !product.breakdown?.length) {
     if (!hasNutrition(product.nutrition)) missing.push('nutrition');
+    // Only once the other four are in, so a product isn't listed twice for nutrition.
+    else if (lacksSugar(product)) missing.push('sugar');
     const needs = weightsNeeded(product, context.lines);
     if (needs.some((need) => !product.weights?.[need.key])) missing.push('weights');
   }

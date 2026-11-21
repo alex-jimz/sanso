@@ -6,8 +6,8 @@
 import data from './basicFoods.json';
 import { normalizeName } from './ingredients';
 import { wordMatch } from './matching';
-import { hasNutrition } from './nutrition';
-import type { Nutrition, Product } from './types';
+import { hasNutrition, type FullNutrition } from './nutrition';
+import type { Product } from './types';
 
 export interface BasicFood {
   name: string;
@@ -20,6 +20,8 @@ export interface BasicFood {
   fat: number;
   /** Without fibre, as on EU labels. */
   carbs: number;
+  /** Left out for the few foods USDA has no sugar value for. */
+  sugar?: number;
   /** Grams in one of a recipe unit, as in Product.weights. */
   weights?: Record<string, number>;
 }
@@ -63,37 +65,44 @@ export function searchBasicFoods(query: string): BasicFood[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function foodNutrition(food: BasicFood): Required<Nutrition> {
-  return { kcal: food.kcal, protein: food.protein, fat: food.fat, carbs: food.carbs };
+export function foodNutrition(food: BasicFood): FullNutrition {
+  const { kcal, protein, fat, carbs, sugar } = food;
+  return { kcal, protein, fat, carbs, ...(sugar !== undefined ? { sugar } : {}) };
 }
 
 export interface FoodFill {
   /** Set when the product had no complete nutrition. */
-  nutrition?: Required<Nutrition>;
+  nutrition?: FullNutrition;
+  /** Set when the product had the other four values per 100 g, but no sugar. */
+  sugar?: number;
   /** Weights the product didn't have yet. */
   weights: Record<string, number>;
 }
 
 /**
  * What a food would add to a product: its nutrition, unless the product
- * already has all four values, and the weights the product doesn't have.
- * The product's own values are never replaced.
+ * already has all four values, in which case only a missing sugar value,
+ * and the weights the product doesn't have. The product's own values are
+ * never replaced.
  */
 export function fillFrom(
   food: BasicFood,
-  product: Pick<Product, 'nutrition' | 'weights'>,
+  product: Pick<Product, 'nutrition' | 'nutritionPer' | 'weights'>,
 ): FoodFill {
   const weights: Record<string, number> = {};
   for (const [key, grams] of Object.entries(food.weights ?? {}))
     if (!product.weights?.[key]) weights[key] = grams;
-  return {
-    nutrition: hasNutrition(product.nutrition) ? undefined : foodNutrition(food),
-    weights,
-  };
+  if (!hasNutrition(product.nutrition)) return { nutrition: foodNutrition(food), weights };
+  // The table is per 100 g, so its sugar can't go with values per piece.
+  const addSugar =
+    product.nutrition.sugar === undefined &&
+    product.nutritionPer !== 'piece' &&
+    food.sugar !== undefined;
+  return { ...(addSugar ? { sugar: food.sugar } : {}), weights };
 }
 
 export function isEmptyFill(fill: FoodFill): boolean {
-  return !fill.nutrition && !Object.keys(fill.weights).length;
+  return !fill.nutrition && fill.sugar === undefined && !Object.keys(fill.weights).length;
 }
 
 /** The product with a fill applied. */
@@ -104,7 +113,9 @@ export function applyFill<T extends Pick<Product, 'nutrition' | 'nutritionPer' |
   const weights = { ...product.weights, ...fill.weights };
   return {
     ...product,
-    nutrition: fill.nutrition ?? product.nutrition,
+    nutrition:
+      fill.nutrition ??
+      (fill.sugar !== undefined ? { ...product.nutrition, sugar: fill.sugar } : product.nutrition),
     // The table's values are per 100 g.
     nutritionPer: fill.nutrition ? undefined : product.nutritionPer,
     weights: Object.keys(weights).length ? weights : undefined,

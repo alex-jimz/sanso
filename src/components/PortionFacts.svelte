@@ -38,6 +38,17 @@
   const hasCost = $derived(facts.costCount > 0);
   const complete = $derived(facts.nutritionCount === total && facts.costCount === total);
   const gaps = $derived(facts.lines.filter((l) => l.missing.length));
+  // Lines that count but whose product has no sugar value: shown apart, as it matters less.
+  const sugarGaps = $derived(facts.lines.filter((l) => !l.missing.length && l.noSugar));
+  const sugarText = $derived(
+    facts.sugarCount === 0
+      ? 'no sugar values yet'
+      : `of which sugar ${formatMacro(facts.sugar)}${
+          facts.sugarCount < facts.nutritionCount
+            ? ` · ${facts.sugarCount} of ${facts.nutritionCount}`
+            : ''
+        }`,
+  );
   const shares = $derived(macroShares(facts.nutrition));
   const segments = $derived(ringSegments(shares));
   let open = $state(false);
@@ -71,6 +82,8 @@
   }
 
   function summary(): string {
+    if (complete && sugarGaps.length)
+      return `All ingredients counted · sugar from ${facts.sugarCount} of ${total}`;
     if (complete) return 'All ingredients counted';
     if (facts.nutritionCount === facts.costCount)
       return `From ${facts.nutritionCount} of ${total} ingredients`;
@@ -112,6 +125,7 @@
               <span class="macro-name">{macroLabels[s.key]}</span>
               <span class="macro-grams">{formatMacro(s.grams)}</span>
               <span class="macro-share">{Math.round(s.share * 100)}%</span>
+              {#if s.key === 'carbs'}<span class="macro-sugar">{sugarText}</span>{/if}
             </li>
           {/each}
         </ul>
@@ -121,7 +135,7 @@
         Add nutrition and prices to this recipe’s products to see calories and cost here.
       </p>
     {/if}
-    {#if complete}
+    {#if complete && !sugarGaps.length}
       <p class="hint coverage">{summary()}</p>
     {:else}
       <button class="coverage-btn" type="button" onclick={() => (open = true)}>
@@ -136,24 +150,43 @@
       <p class="hint">
         Tap an ingredient to pick or fill in its product. Cost uses regular prices, not offers.
       </p>
-      <ul class="list">
-        {#each gaps as gap, i (i)}
-          <li>
-            <button class="row" type="button" onclick={() => openLine(gap)}>
-              <span class="row-main">
-                <span class="row-title">{gap.line.text}</span>
-                <span class="row-sub"
-                  >{gap.product ? `${gap.product.name}: ` : ''}{describe(
-                    gap.missing,
-                    gap.product,
-                  )}</span
-                >
-              </span>
-              <ChevronRight size={18} />
-            </button>
-          </li>
-        {/each}
-      </ul>
+      {#if gaps.length}
+        <ul class="list">
+          {#each gaps as gap, i (i)}
+            <li>
+              <button class="row" type="button" onclick={() => openLine(gap)}>
+                <span class="row-main">
+                  <span class="row-title">{gap.line.text}</span>
+                  <span class="row-sub"
+                    >{gap.product ? `${gap.product.name}: ` : ''}{describe(
+                      gap.missing,
+                      gap.product,
+                    )}</span
+                  >
+                </span>
+                <ChevronRight size={18} />
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      {#if sugarGaps.length}
+        <h3 class="eyebrow sugar-head">No sugar value</h3>
+        <p class="hint">These count, but sugar per portion leaves them out.</p>
+        <ul class="list">
+          {#each sugarGaps as gap, i (i)}
+            <li>
+              <button class="row" type="button" onclick={() => openLine(gap)}>
+                <span class="row-main">
+                  <span class="row-title">{gap.line.text}</span>
+                  <span class="row-sub">{gap.product?.name}</span>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
     </div>
   </Sheet>
 {/if}
@@ -249,6 +282,17 @@
     opacity: 0.75;
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+
+  .macro-sugar {
+    grid-column: 1 / -1;
+    margin-top: -2px;
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+
+  .sugar-head {
+    margin: 8px 0 0;
   }
 
   .facts > .hint {
