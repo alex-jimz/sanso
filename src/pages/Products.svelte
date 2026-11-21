@@ -194,9 +194,9 @@
     {#if filter === 'missing' && missingAny}
       <p class="missing-hint">
         Prices and pack sizes give costs, nutrition and weights give calories, and sections and
-        photos help in the shop.
+        photos help in the shop. Sugar is extra: recipes count without it.
       </p>
-      {#if missingCounts.some((k) => k.kind === 'nutrition' || k.kind === 'weights')}
+      {#if missingCounts.some((k) => ['nutrition', 'sugar', 'weights'].includes(k.kind))}
         <a
           class="aldi basic"
           href="#/more/basic-foods"

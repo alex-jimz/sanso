@@ -23,7 +23,7 @@ const complete: Partial<Product> = {
   packUnit: 'g',
   sectionId: 'grains',
   imageUrl: 'https://example.com/rice.jpg',
-  nutrition: { kcal: 350, protein: 7, fat: 1, carbs: 78 },
+  nutrition: { kcal: 350, protein: 7, fat: 1, carbs: 78, sugar: 0.5 },
 };
 
 const context = (extra: Partial<MissingContext> = {}): MissingContext => ({
@@ -46,6 +46,15 @@ describe('missingInfo', () => {
       'section',
       'photo',
     ]);
+  });
+
+  it('lists sugar apart, and only once the other four values are in', () => {
+    const { sugar: _, ...noSugar } = complete.nutrition!;
+    expect(missingInfo(product('Rice', { ...complete, nutrition: noSugar }), context())).toEqual([
+      'sugar',
+    ]);
+    const partial = { ...complete, nutrition: { kcal: 350 } };
+    expect(missingInfo(product('Rice', partial), context())).toEqual(['nutrition']);
   });
 
   it('asks for weights that recipe lines need', () => {

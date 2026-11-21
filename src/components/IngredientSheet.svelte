@@ -68,7 +68,8 @@
       facts.nutrition ? `${formatKcal(facts.nutrition.kcal / count)} kcal` : undefined,
       facts.cost !== undefined ? formatPrice(facts.cost / count) : undefined,
     ].filter(Boolean);
-    const needs = needsText(facts.missing, isPart(option.product));
+    const needs =
+      needsText(facts.missing, isPart(option.product)) || (facts.noSugar ? 'No sugar value' : '');
     if (!parts.length) return needs || 'Nothing missing';
     return [`${parts.join(' · ')} per portion`, needs].filter(Boolean).join('. ');
   }
@@ -180,6 +181,11 @@
             </span>
             <ChevronRight size={18} />
           </button>
+        {:else if chosenFacts?.product && chosenFacts.noSugar}
+          <button class="add-sugar" type="button" onclick={() => fillIn(chosenFacts.product!)}>
+            Add sugar to {chosenFacts.product.name}
+            <ChevronRight size={16} />
+          </button>
         {/if}
 
         {#if canMakeUsual && chosen?.product}
@@ -252,5 +258,17 @@
   .fill .row-sub {
     color: inherit;
     opacity: 0.85;
+  }
+
+  .add-sugar {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 2px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.875rem;
   }
 </style>

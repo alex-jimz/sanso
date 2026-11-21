@@ -220,14 +220,18 @@ async function bannerImage(doc: PDFDocument, photo: Blob): Promise<PDFImage | un
   }
 }
 
-/** "From 5 of 9 ingredients", as on the recipe page. */
+/** "From 5 of 9 ingredients", as on the recipe page, and how many have sugar if not all. */
 export function factsSummary(facts: RecipeFacts): string {
   const total = facts.lines.length;
+  const sugar =
+    facts.nutritionCount && facts.sugarCount < facts.nutritionCount
+      ? ` Sugar from ${facts.sugarCount} of ${facts.nutritionCount}.`
+      : '';
   if (facts.nutritionCount === total && facts.costCount === total)
-    return 'All ingredients counted.';
+    return `All ingredients counted.${sugar}`;
   if (facts.nutritionCount === facts.costCount)
-    return `From ${facts.nutritionCount} of ${total} ingredients.`;
-  return `Calories from ${facts.nutritionCount} of ${total} ingredients, cost from ${facts.costCount}.`;
+    return `From ${facts.nutritionCount} of ${total} ingredients.${sugar}`;
+  return `Calories from ${facts.nutritionCount} of ${total} ingredients, cost from ${facts.costCount}.${sugar}`;
 }
 
 export async function recipePdf(input: RecipePdfInput): Promise<Blob> {
@@ -400,6 +404,17 @@ export async function recipePdf(input: RecipePdfInput): Promise<Blob> {
           font: bold,
           color: text,
         });
+        // Sugar, the "of which" part of carbs, small beside the label.
+        if (s.key === 'carbs' && facts.sugarCount) {
+          first.drawText(`sugar ${formatMacro(facts.sugar)}`, {
+            x: x0 + 14 + bold.widthOfTextAtSize(macroLabels[s.key], 9),
+            y: top - 15.5,
+            size: 7,
+            font: sans,
+            color: text,
+            opacity: 0.75,
+          });
+        }
         const grams = formatMacro(s.grams);
         first.drawText(grams, {
           x: x0 + 128 - serif.widthOfTextAtSize(grams, 12),

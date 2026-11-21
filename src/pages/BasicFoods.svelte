@@ -21,7 +21,7 @@
   import type { Product } from '../lib/types';
   import { showToast } from '../lib/ui.svelte';
 
-  // Products that lack nutrition or a weight their recipes need, as on the Missing info filter.
+  // Products that lack nutrition, sugar or a weight their recipes need, as on the Missing info filter.
   const lines = linesByProduct(store.recipes, store.resolve);
   const candidates = store.products
     .filter((p) => {
@@ -30,7 +30,9 @@
         isPart: !!store.sources.get(p.id)?.length,
         lines: lines.get(p.id) ?? [],
       });
-      return missing.includes('nutrition') || missing.includes('weights');
+      return (
+        missing.includes('nutrition') || missing.includes('sugar') || missing.includes('weights')
+      );
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -79,8 +81,11 @@
     const n = fill.nutrition;
     if (n)
       parts.push(
-        `${n.kcal} kcal · P ${formatMacro(n.protein)} · F ${formatMacro(n.fat)} · C ${formatMacro(n.carbs)}`,
+        `${n.kcal} kcal · P ${formatMacro(n.protein)} · F ${formatMacro(n.fat)} · C ${formatMacro(n.carbs)}${
+          n.sugar !== undefined ? ` (sugar ${formatMacro(n.sugar)})` : ''
+        }`,
       );
+    if (fill.sugar !== undefined) parts.push(`Sugar ${formatMacro(fill.sugar)}`);
     for (const [key, grams] of Object.entries(fill.weights))
       parts.push(`${weightLabel(key)} ${grams} g`);
     return parts.join(' · ');

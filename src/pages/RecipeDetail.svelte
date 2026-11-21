@@ -69,13 +69,16 @@
       const isPart = !!product && !!store.sources.get(product.id)?.length;
       parts.push(`needs ${missingPhrases(facts.missing, isPart).join(', ')}`);
     }
+    if (facts?.noSugar) parts.push('no sugar value');
     const sub = parts.join(' · ');
     const label =
       status === 'unlinked'
         ? 'Not linked to a product'
         : status === 'incomplete'
           ? 'Product is missing information'
-          : 'Linked';
+          : status === 'noSugar'
+            ? 'Product has no sugar value'
+            : 'Linked';
     return { status, sub: sub && sub[0]!.toUpperCase() + sub.slice(1), label };
   }
 
@@ -83,6 +86,7 @@
   const needsWork = $derived(
     infos.some((i) => i?.status === 'unlinked' || i?.status === 'incomplete'),
   );
+  const anyNoSugar = $derived(infos.some((i) => i?.status === 'noSugar'));
 
   $effect(() => {
     if (recipe) portions = recipe.portions;
@@ -212,6 +216,10 @@
                       <span class="status incomplete" role="img" aria-label={info.label}
                         ><TriangleAlert size={15} strokeWidth={2.4} /></span
                       >
+                    {:else if info?.status === 'noSugar'}
+                      <span class="status no-sugar" role="img" aria-label={info.label}
+                        ><span class="dot"></span></span
+                      >
                     {/if}
                   </button>
                 </li>
@@ -229,9 +237,16 @@
                   ><TriangleAlert size={11} strokeWidth={2.6} /></span
                 > Product missing info</span
               >
+            {/if}
+            {#if anyNoSugar}
+              <span class="key"
+                ><span class="status no-sugar small"><span class="dot"></span></span> No sugar value</span
+              >
+            {/if}
+            {#if needsWork}
               <span>Tap an ingredient to fix it.</span>
             {:else}
-              Tap an ingredient to change its product.
+              <span>Tap an ingredient to change its product.</span>
             {/if}
           </p>
         {:else}
@@ -431,6 +446,15 @@
     background: var(--mustard-soft);
     color: var(--mustard);
     box-shadow: inset 0 0 0 1.5px var(--mustard);
+  }
+
+  /* Quieter than the other signs: only sugar is missing, and it matters less. */
+  .status.no-sugar .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1.5px var(--mustard);
+    opacity: 0.8;
   }
 
   .status.small {

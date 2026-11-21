@@ -15,6 +15,7 @@
    "protein": 1.1,
    "fat": 0.1,
    "carbs": 7.6,
+   "sugar": 4.2,
    "weights": {
     "piece": 110,
     "tbsp": 10
@@ -33,6 +34,7 @@
    "protein": 1.8,
    "fat": 0.2,
    "carbs": 4.7,
+   "sugar": 2.3,
    "weights": {
     "piece": 15
    }
@@ -46,6 +48,7 @@
    "protein": 2.5,
    "fat": 0.1,
    "carbs": 13.6,
+   "sugar": 7.9,
    "weights": {
     "tbsp": 10
    }
@@ -59,6 +62,7 @@
    "protein": 6.4,
    "fat": 0.5,
    "carbs": 31,
+   "sugar": 1,
    "weights": {
     "clove": 3,
     "tsp": 2.8
@@ -73,6 +77,7 @@
    "protein": 1.5,
    "fat": 0.3,
    "carbs": 12.4,
+   "sugar": 3.9,
    "weights": {
     "piece": 89
    }
@@ -86,6 +91,7 @@
    "protein": 0.9,
    "fat": 0.2,
    "carbs": 6.8,
+   "sugar": 4.7,
    "weights": {
     "piece": 61
    }
@@ -104,6 +110,7 @@
    "protein": 2.1,
    "fat": 0.1,
    "carbs": 15.4,
+   "sugar": 0.8,
    "weights": {
     "piece": 213
    }
@@ -117,6 +124,7 @@
    "protein": 1.6,
    "fat": 0.1,
    "carbs": 17.1,
+   "sugar": 4.2,
    "weights": {
     "piece": 130
    }
@@ -130,6 +138,7 @@
    "protein": 1.2,
    "fat": 0.3,
    "carbs": 13.1,
+   "sugar": 4.8,
    "weights": {
     "piece": 133
    }
@@ -143,6 +152,7 @@
    "protein": 0.9,
    "fat": 0.1,
    "carbs": 4.6,
+   "sugar": 3.8,
    "weights": {
     "piece": 122
    }
@@ -158,6 +168,7 @@
    "protein": 1.1,
    "fat": 0.2,
    "carbs": 6.3,
+   "sugar": 4.5,
    "weights": {
     "piece": 772
    }
@@ -173,6 +184,7 @@
    "protein": 1.6,
    "fat": 0.2,
    "carbs": 6.8,
+   "sugar": 6.8,
    "weights": {
     "piece": 82
    }
@@ -186,6 +198,7 @@
    "protein": 0.7,
    "fat": 0.2,
    "carbs": 1.4,
+   "sugar": 1.3,
    "weights": {
     "stalk": 40,
     "piece": 40
@@ -199,7 +212,8 @@
    "kcal": 42,
    "protein": 1.5,
    "fat": 0.3,
-   "carbs": 7.4
+   "carbs": 7.4,
+   "sugar": 1.6
   },
   {
    "name": "Fennel",
@@ -210,6 +224,7 @@
    "protein": 1.2,
    "fat": 0.2,
    "carbs": 4.2,
+   "sugar": 3.9,
    "weights": {
     "piece": 234
    }
@@ -223,6 +238,7 @@
    "protein": 0.7,
    "fat": 0.1,
    "carbs": 3.1,
+   "sugar": 1.7,
    "weights": {
     "piece": 301
    }
@@ -239,6 +255,7 @@
    "protein": 0.9,
    "fat": 0.2,
    "carbs": 2.7,
+   "sugar": 2.6,
    "weights": {
     "piece": 123
    }
@@ -252,6 +269,7 @@
    "protein": 0.9,
    "fat": 0.2,
    "carbs": 2.7,
+   "sugar": 2.6,
    "weights": {
     "piece": 17
    }
@@ -267,6 +285,7 @@
    "protein": 1,
    "fat": 0.3,
    "carbs": 3.9,
+   "sugar": 3.9,
    "weights": {
     "piece": 119
    }
@@ -282,6 +301,7 @@
    "protein": 0.9,
    "fat": 0.2,
    "carbs": 2.9,
+   "sugar": 2.4,
    "weights": {
     "piece": 119
    }
@@ -314,6 +334,7 @@
    "protein": 1.9,
    "fat": 0.4,
    "carbs": 7.3,
+   "sugar": 5.3,
    "weights": {
     "piece": 45
    }
@@ -329,6 +350,7 @@
    "protein": 2.8,
    "fat": 0.4,
    "carbs": 4,
+   "sugar": 1.7,
    "weights": {
     "piece": 608
    }
@@ -342,6 +364,7 @@
    "protein": 1.9,
    "fat": 0.3,
    "carbs": 3,
+   "sugar": 1.9,
    "weights": {
     "piece": 588
    }
@@ -359,6 +382,7 @@
    "protein": 1.3,
    "fat": 0.1,
    "carbs": 3.3,
+   "sugar": 3.2,
    "weights": {
     "piece": 908
    }
@@ -372,6 +396,7 @@
    "protein": 1.4,
    "fat": 0.2,
    "carbs": 5.3,
+   "sugar": 3.8,
    "weights": {
     "piece": 839
    }
@@ -385,6 +410,7 @@
    "protein": 3.4,
    "fat": 0.3,
    "carbs": 5.1,
+   "sugar": 2.2,
    "weights": {
     "piece": 19
    }
@@ -399,7 +425,8 @@
    "kcal": 13,
    "protein": 1.5,
    "fat": 0.2,
-   "carbs": 1.2
+   "carbs": 1.2,
+   "sugar": 1.2
   },
   {
    "name": "Kale",
@@ -409,7 +436,8 @@
    "kcal": 35,
    "protein": 2.9,
    "fat": 1.5,
-   "carbs": 0.3
+   "carbs": 0.3,
+   "sugar": 0.3
   },
   {
    "name": "Spinach",
@@ -421,7 +449,8 @@
    "kcal": 23,
    "protein": 2.9,
    "fat": 0.4,
-   "carbs": 1.4
+   "carbs": 1.4,
+   "sugar": 0.4
   },
   {
    "name": "Rocket",
@@ -433,7 +462,8 @@
    "kcal": 25,
    "protein": 2.6,
    "fat": 0.7,
-   "carbs": 2.1
+   "carbs": 2.1,
+   "sugar": 2.1
   },
   {
    "name": "Iceberg lettuce",
@@ -446,6 +476,7 @@
    "protein": 0.9,
    "fat": 0.1,
    "carbs": 1.8,
+   "sugar": 1.8,
    "weights": {
     "piece": 539
    }
@@ -462,6 +493,7 @@
    "protein": 1.2,
    "fat": 0.3,
    "carbs": 1.2,
+   "sugar": 1.2,
    "weights": {
     "piece": 626
    }
@@ -477,6 +509,7 @@
    "protein": 1.2,
    "fat": 0.3,
    "carbs": 2.1,
+   "sugar": 2.1,
    "weights": {
     "piece": 196
    }
@@ -492,6 +525,7 @@
    "protein": 1,
    "fat": 0.2,
    "carbs": 2.9,
+   "sugar": 2.9,
    "weights": {
     "piece": 458
    }
@@ -504,7 +538,8 @@
    "kcal": 45,
    "protein": 1,
    "fat": 0.1,
-   "carbs": 9.7
+   "carbs": 9.7,
+   "sugar": 2.2
   },
   {
    "name": "Pumpkin",
@@ -514,7 +549,8 @@
    "kcal": 26,
    "protein": 1,
    "fat": 0.1,
-   "carbs": 6
+   "carbs": 6,
+   "sugar": 2.8
   },
   {
    "name": "Mushroom",
@@ -529,6 +565,7 @@
    "protein": 3.1,
    "fat": 0.3,
    "carbs": 2.3,
+   "sugar": 2,
    "weights": {
     "piece": 18
    }
@@ -545,6 +582,7 @@
    "protein": 2.5,
    "fat": 0.1,
    "carbs": 3.7,
+   "sugar": 1.7,
    "weights": {
     "piece": 20
    }
@@ -560,7 +598,8 @@
    "kcal": 31,
    "protein": 1.8,
    "fat": 0.2,
-   "carbs": 4.3
+   "carbs": 4.3,
+   "sugar": 3.3
   },
   {
    "name": "Peas",
@@ -573,7 +612,8 @@
    "kcal": 81,
    "protein": 5.4,
    "fat": 0.4,
-   "carbs": 8.8
+   "carbs": 8.8,
+   "sugar": 5.7
   },
   {
    "name": "Sweetcorn",
@@ -587,6 +627,7 @@
    "protein": 3.3,
    "fat": 1.4,
    "carbs": 16.7,
+   "sugar": 6.3,
    "weights": {
     "piece": 102
    }
@@ -600,6 +641,7 @@
    "protein": 2.2,
    "fat": 0.1,
    "carbs": 1.8,
+   "sugar": 1.8,
    "weights": {
     "piece": 16
    }
@@ -613,6 +655,7 @@
    "protein": 0.7,
    "fat": 0.1,
    "carbs": 1.8,
+   "sugar": 1.8,
    "weights": {
     "piece": 4.5
    }
@@ -629,6 +672,7 @@
    "protein": 1.8,
    "fat": 0.8,
    "carbs": 15.8,
+   "sugar": 1.7,
    "weights": {
     "tsp": 2
    }
@@ -645,6 +689,7 @@
    "protein": 3,
    "fat": 0.8,
    "carbs": 3,
+   "sugar": 0.9,
    "weights": {
     "tbsp": 3.8,
     "sprig": 1
@@ -662,6 +707,7 @@
    "protein": 2.1,
    "fat": 0.5,
    "carbs": 0.9,
+   "sugar": 0.9,
    "weights": {
     "sprig": 2.2
    }
@@ -677,6 +723,7 @@
    "protein": 3.2,
    "fat": 0.6,
    "carbs": 1,
+   "sugar": 0.3,
    "weights": {
     "tbsp": 2.7
    }
@@ -705,6 +752,7 @@
    "protein": 1.1,
    "fat": 0.3,
    "carbs": 20.2,
+   "sugar": 12.2,
    "weights": {
     "piece": 118
    }
@@ -718,6 +766,7 @@
    "protein": 0.3,
    "fat": 0.2,
    "carbs": 11.4,
+   "sugar": 10.4,
    "weights": {
     "piece": 182
    }
@@ -731,6 +780,7 @@
    "protein": 0.4,
    "fat": 0.1,
    "carbs": 12.1,
+   "sugar": 9.8,
    "weights": {
     "piece": 178
    }
@@ -744,6 +794,7 @@
    "protein": 0.9,
    "fat": 0.1,
    "carbs": 9.4,
+   "sugar": 9.4,
    "weights": {
     "piece": 131
    }
@@ -762,6 +813,7 @@
    "protein": 0.8,
    "fat": 0.3,
    "carbs": 11.5,
+   "sugar": 10.6,
    "weights": {
     "piece": 88
    }
@@ -775,6 +827,7 @@
    "protein": 1.1,
    "fat": 0.3,
    "carbs": 6.5,
+   "sugar": 2.5,
    "weights": {
     "piece": 58
    }
@@ -788,6 +841,7 @@
    "protein": 0.7,
    "fat": 0.2,
    "carbs": 7.7,
+   "sugar": 1.7,
    "weights": {
     "piece": 67
    }
@@ -804,6 +858,7 @@
    "protein": 0.7,
    "fat": 0.2,
    "carbs": 17.2,
+   "sugar": 15.5,
    "weights": {
     "piece": 4.9
    }
@@ -819,6 +874,7 @@
    "protein": 0.7,
    "fat": 0.3,
    "carbs": 5.7,
+   "sugar": 4.9,
    "weights": {
     "piece": 12
    }
@@ -833,7 +889,8 @@
    "kcal": 57,
    "protein": 0.7,
    "fat": 0.3,
-   "carbs": 12.1
+   "carbs": 12.1,
+   "sugar": 10
   },
   {
    "name": "Raspberries",
@@ -845,7 +902,8 @@
    "kcal": 52,
    "protein": 1.2,
    "fat": 0.7,
-   "carbs": 5.4
+   "carbs": 5.4,
+   "sugar": 4.4
   },
   {
    "name": "Kiwi",
@@ -859,6 +917,7 @@
    "protein": 1.1,
    "fat": 0.5,
    "carbs": 11.7,
+   "sugar": 9,
    "weights": {
     "piece": 69
    }
@@ -872,6 +931,7 @@
    "protein": 0.8,
    "fat": 0.4,
    "carbs": 13.4,
+   "sugar": 13.4,
    "weights": {
     "piece": 336
    }
@@ -885,6 +945,7 @@
    "protein": 0.5,
    "fat": 0.1,
    "carbs": 11.7,
+   "sugar": 9.9,
    "weights": {
     "piece": 905
    }
@@ -898,6 +959,7 @@
    "protein": 0.9,
    "fat": 0.3,
    "carbs": 8,
+   "sugar": 8,
    "weights": {
     "piece": 150
    }
@@ -911,6 +973,7 @@
    "protein": 1.1,
    "fat": 0.3,
    "carbs": 8.9,
+   "sugar": 7.9,
    "weights": {
     "piece": 142
    }
@@ -924,6 +987,7 @@
    "protein": 0.7,
    "fat": 0.3,
    "carbs": 10,
+   "sugar": 9.9,
    "weights": {
     "piece": 66
    }
@@ -937,6 +1001,7 @@
    "protein": 2,
    "fat": 14.7,
    "carbs": 1.8,
+   "sugar": 0.7,
    "weights": {
     "piece": 201
    }
@@ -951,7 +1016,8 @@
    "kcal": 34,
    "protein": 0.8,
    "fat": 0.2,
-   "carbs": 7.3
+   "carbs": 7.3,
+   "sugar": 7.3
   },
   {
    "name": "Watermelon",
@@ -961,7 +1027,8 @@
    "kcal": 30,
    "protein": 0.6,
    "fat": 0.2,
-   "carbs": 7.2
+   "carbs": 7.2,
+   "sugar": 6.2
   },
   {
    "name": "Egg",
@@ -975,6 +1042,7 @@
    "protein": 12.6,
    "fat": 9.5,
    "carbs": 0.7,
+   "sugar": 0.4,
    "weights": {
     "piece": 50
    }
@@ -989,7 +1057,8 @@
    "kcal": 215,
    "protein": 18.6,
    "fat": 15.1,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Chicken breast",
@@ -1002,7 +1071,8 @@
    "kcal": 120,
    "protein": 22.5,
    "fat": 2.6,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Chicken thighs",
@@ -1017,6 +1087,7 @@
    "protein": 19.7,
    "fat": 4.1,
    "carbs": 0,
+   "sugar": 0,
    "weights": {
     "piece": 149
    }
@@ -1033,6 +1104,7 @@
    "protein": 18.1,
    "fat": 9.2,
    "carbs": 0.1,
+   "sugar": 0,
    "weights": {
     "piece": 133
    }
@@ -1049,6 +1121,7 @@
    "protein": 17.5,
    "fat": 12.9,
    "carbs": 0,
+   "sugar": 0,
    "weights": {
     "piece": 107
    }
@@ -1065,7 +1138,8 @@
    "kcal": 137,
    "protein": 21.4,
    "fat": 5,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Beef mince 10% fat",
@@ -1080,7 +1154,8 @@
    "kcal": 176,
    "protein": 20,
    "fat": 10,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Beef mince 15% fat",
@@ -1092,7 +1167,8 @@
    "kcal": 215,
    "protein": 18.6,
    "fat": 15,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Beef mince 20% fat",
@@ -1104,7 +1180,8 @@
    "kcal": 254,
    "protein": 17.2,
    "fat": 20,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Pork mince",
@@ -1117,7 +1194,8 @@
    "kcal": 263,
    "protein": 16.9,
    "fat": 21.2,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Lamb mince",
@@ -1130,7 +1208,8 @@
    "kcal": 282,
    "protein": 16.6,
    "fat": 23.4,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Pork belly",
@@ -1140,7 +1219,8 @@
    "kcal": 518,
    "protein": 9.3,
    "fat": 53,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Salmon",
@@ -1152,7 +1232,8 @@
    "kcal": 208,
    "protein": 20.4,
    "fat": 13.4,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Cod",
@@ -1164,7 +1245,8 @@
    "kcal": 82,
    "protein": 17.8,
    "fat": 0.7,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Haddock",
@@ -1176,7 +1258,8 @@
    "kcal": 74,
    "protein": 16.3,
    "fat": 0.5,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Mackerel",
@@ -1189,6 +1272,7 @@
    "protein": 18.6,
    "fat": 13.9,
    "carbs": 0,
+   "sugar": 0,
    "weights": {
     "fillet": 112,
     "piece": 112
@@ -1206,7 +1290,8 @@
    "kcal": 85,
    "protein": 20.1,
    "fat": 0.5,
-   "carbs": 0
+   "carbs": 0,
+   "sugar": 0
   },
   {
    "name": "Olive oil",
@@ -1219,6 +1304,7 @@
    "protein": 0,
    "fat": 100,
    "carbs": 0,
+   "sugar": 0,
    "weights": {
     "tbsp": 13.5,
     "tsp": 4.5
@@ -1236,6 +1322,7 @@
    "protein": 0,
    "fat": 100,
    "carbs": 0,
+   "sugar": 0,
    "weights": {
     "tbsp": 13.6,
     "tsp": 4.5
@@ -1250,6 +1337,7 @@
    "protein": 0.9,
    "fat": 81.1,
    "carbs": 0.1,
+   "sugar": 0.1,
    "weights": {
     "tbsp": 14.2
    }
@@ -1267,6 +1355,7 @@
    "protein": 0,
    "fat": 0,
    "carbs": 100,
+   "sugar": 99.8,
    "weights": {
     "tsp": 4.2,
     "cup": 200
@@ -1281,6 +1370,7 @@
    "protein": 0.3,
    "fat": 0,
    "carbs": 82.2,
+   "sugar": 82.1,
    "weights": {
     "tbsp": 21
    }
@@ -1297,6 +1387,7 @@
    "protein": 10.3,
    "fat": 1,
    "carbs": 73.6,
+   "sugar": 0.3,
    "weights": {
     "cup": 125
    }
@@ -1314,6 +1405,7 @@
    "protein": 7.1,
    "fat": 0.7,
    "carbs": 78.7,
+   "sugar": 0.1,
    "weights": {
     "cup": 185
    }
@@ -1327,6 +1419,7 @@
    "protein": 7.5,
    "fat": 3.2,
    "carbs": 72.7,
+   "sugar": 0.7,
    "weights": {
     "cup": 185
    }
@@ -1344,7 +1437,8 @@
    "kcal": 371,
    "protein": 13,
    "fat": 1.5,
-   "carbs": 71.5
+   "carbs": 71.5,
+   "sugar": 2.7
   },
   {
    "name": "Oats",
@@ -1358,6 +1452,7 @@
    "protein": 13.2,
    "fat": 6.5,
    "carbs": 57.6,
+   "sugar": 1,
    "weights": {
     "cup": 81
    }
@@ -1376,6 +1471,7 @@
    "protein": 24.6,
    "fat": 1.1,
    "carbs": 52.7,
+   "sugar": 2,
    "weights": {
     "cup": 192
    }

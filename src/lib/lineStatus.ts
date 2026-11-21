@@ -6,8 +6,11 @@ import { isTapWater, normalizeName } from './ingredients';
 import { lineFacts, weightLabel, type LineFacts, type Missing } from './nutrition';
 import type { Product } from './types';
 
-/** "unlinked": no product. "incomplete": the product is missing something. "skip": tap water. */
-export type LineStatus = 'ready' | 'unlinked' | 'incomplete' | 'skip';
+/**
+ * "unlinked": no product. "incomplete": the product is missing something.
+ * "noSugar": everything is there but sugar, which matters less. "skip": tap water.
+ */
+export type LineStatus = 'ready' | 'unlinked' | 'incomplete' | 'noSugar' | 'skip';
 
 export function optionFacts(
   option: Pick<Option, 'line' | 'product'>,
@@ -21,7 +24,8 @@ export function optionFacts(
 export function lineStatus(facts: LineFacts | undefined): LineStatus {
   if (!facts) return 'skip';
   if (!facts.product) return 'unlinked';
-  return facts.missing.length ? 'incomplete' : 'ready';
+  if (facts.missing.length) return 'incomplete';
+  return facts.noSugar ? 'noSugar' : 'ready';
 }
 
 /**

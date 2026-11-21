@@ -61,6 +61,8 @@ export interface Nutrition {
   fat?: number;
   /** Grams, without fibre, as on EU labels. */
   carbs?: number;
+  /** Grams, the "of which sugars" part of carbs. Optional: the other four are what counts. */
+  sugar?: number;
 }
 
 /** One part a product breaks down into at home, per pack, as in 450 g of thighs per chicken. */

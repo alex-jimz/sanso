@@ -27,6 +27,8 @@
     countedLines,
     nutrientKeys,
     nutrientLabels,
+    storedKeys,
+    sugarLabel,
     weightLabel,
     weightsNeeded,
   } from '../lib/nutrition';
@@ -118,7 +120,7 @@
     return weeks.find((w) => w.from === offer.from)?.label ?? '';
   }
   let nutrition = $state<Record<string, string>>(
-    Object.fromEntries(nutrientKeys.map((k) => [k, base.nutrition?.[k]?.toString() ?? ''])),
+    Object.fromEntries(storedKeys.map((k) => [k, base.nutrition?.[k]?.toString() ?? ''])),
   );
   let negligible = $state(!!base.negligible);
   let perPiece = $state(base.nutritionPer === 'piece');
@@ -215,6 +217,12 @@
     carbs: 'g',
   };
   const weightHints: Record<string, string> = { tsp: '5', tbsp: '15', clove: '5' };
+  // Sugar is part of carbs, so more sugar than carbs is a typo.
+  const sugarTooHigh = $derived.by(() => {
+    const sugar = parseDecimal(nutrition.sugar);
+    const carbs = parseDecimal(nutrition.carbs);
+    return sugar !== undefined && carbs !== undefined && sugar > carbs;
+  });
 
   const recipeLines = $derived(store.recipes.flatMap((r) => countedLines(r.ingredients)));
   // Ingredient names in recipes that this product's name contains, as "ground beef" for Ground beef 10% fat.
@@ -254,7 +262,10 @@
   function useFood(food: BasicFood) {
     // The table's values are per 100 g.
     perPiece = false;
-    for (const key of nutrientKeys) nutrition[key] = String(foodNutrition(food)[key]);
+    const values = foodNutrition(food);
+    for (const key of nutrientKeys) nutrition[key] = String(values[key]);
+    // A few foods have no sugar value; anything typed for sugar then stays.
+    if (values.sugar !== undefined) nutrition.sugar = String(values.sugar);
     // Weights already typed stay; the food only adds the ones missing.
     for (const [key, grams] of Object.entries(food.weights ?? {}))
       if (!parseDecimal(weights[key])) weights[key] = String(grams);
@@ -333,7 +344,7 @@
       notFor,
       offers: allOffers.length ? allOffers : undefined,
       nutrition: cleanNutrition(
-        Object.fromEntries(nutrientKeys.map((k) => [k, parseDecimal(nutrition[k])])),
+        Object.fromEntries(storedKeys.map((k) => [k, parseDecimal(nutrition[k])])),
       ),
       nutritionPer: perPiece ? 'piece' : undefined,
       negligible: negligible || undefined,
@@ -687,7 +698,25 @@
               </span>
             </label>
           {/each}
+          <label class="field sugar-field">
+            <span class="field-label">{sugarLabel} <span class="optional">of carbs</span></span>
+            <span class="with-suffix">
+              <input
+                class="input"
+                inputmode="decimal"
+                bind:value={nutrition.sugar}
+                placeholder="0"
+                aria-label={`${sugarLabel} per ${perPiece ? 'piece' : per100Label}`}
+              />
+              <span class="suffix">g</span>
+            </span>
+          </label>
         </div>
+        {#if sugarTooHigh}
+          <p class="hint warn">
+            Sugar is part of carbs, so it can’t be more than {nutrition.carbs} g.
+          </p>
+        {/if}
         {#if neededWeights.length}
           <div class="stack weights">
             <div>
@@ -1159,6 +1188,16 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+  }
+
+  /* Under carbs, as "of which sugars" on a label. */
+  .sugar-field {
+    grid-column: 2;
+  }
+
+  .optional {
+    color: var(--muted);
+    font-weight: 400;
   }
 
   .food-fill {

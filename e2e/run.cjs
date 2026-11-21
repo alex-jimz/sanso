@@ -1410,6 +1410,10 @@ async function basicFoodsFill(browser, github) {
       sectionId: 'veg',
       listMode: 'auto',
       aliases: [],
+      // Priced, so the only thing left to miss once filled in is sugar.
+      price: 1,
+      packSize: 1000,
+      packUnit: 'g',
       createdAt: now,
       updatedAt: now,
       ...extra,
@@ -1457,10 +1461,10 @@ async function basicFoodsFill(browser, github) {
   const ready = page.locator('section', { hasText: 'Ready to fill in' });
   const readyText = await ready.innerText();
   check(
-    /Irish brown onions\s*As Onion\s*40 kcal · P 1.1 g · F 0.1 g · C 7.6 g · 1 piece 110 g/.test(
+    /Irish brown onions\s*As Onion\s*40 kcal · P 1.1 g · F 0.1 g · C 7.6 g \(sugar 4.2 g\) · 1 piece 110 g/.test(
       readyText,
     ),
-    'the onions are matched to Onion, with its values and piece weight',
+    'the onions are matched to Onion, with its values, sugar and piece weight',
   );
   check(
     readyText.includes('Leeks') &&
@@ -1469,9 +1473,9 @@ async function basicFoodsFill(browser, github) {
     'leeks, potatoes and carrots are matched too',
   );
   check(
-    /Garlic\s*As Garlic\s*1 clove 3 g/.test(readyText) &&
+    /Garlic\s*As Garlic\s*Sugar 1 g · 1 clove 3 g/.test(readyText) &&
       !/Garlic\s*As Garlic\s*149 kcal/.test(readyText),
-    'garlic with its own nutrition only gets the clove weight',
+    'garlic with its own nutrition only gets the sugar it lacked and the clove weight',
   );
   const noMatch = await page.locator('section', { hasText: 'No match' }).innerText();
   check(noMatch.includes('Garlic bread'), 'Garlic bread isn’t taken for garlic');
@@ -1516,11 +1520,84 @@ async function basicFoodsFill(browser, github) {
   await page.goto(`${BASE}#/recipes/soup`);
   const facts = await page.locator('.facts').innerText();
   check(
-    facts.includes('Calories from 5 of 5 ingredients') || facts.includes('From 5 of 5'),
+    facts.includes('All ingredients counted') && !facts.includes('sugar from'),
     `the soup counts all five ingredients for calories (${facts.split('\n').at(-1)})`,
+  );
+  check(
+    /Carbs[\s\S]*of which sugar \d+(\.\d)? g\b(?! ·)/.test(facts) &&
+      !(await page.locator('.status.no-sugar').count()),
+    'every soup product has sugar from the table, shown under carbs',
   );
   await page.locator('.facts').scrollIntoViewIfNeeded();
   await shot(page, '29 Soup per portion');
+
+  // Sugar is extra: clearing it from the leeks keeps them counted, with a quieter sign.
+  await page.goto(`${BASE}#/products/leek`);
+  const sugarField = page.getByLabel('Sugar per 100 g');
+  check(Number(await sugarField.inputValue()) > 0, 'the leeks got a sugar value');
+  await sugarField.fill('99');
+  check(
+    (await page.locator('.hint.warn', { hasText: 'Sugar is part of carbs' }).count()) === 1,
+    'the form warns when sugar is more than carbs',
+  );
+  await sugarField.fill('');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('heading', { name: 'Products' }).waitFor();
+  await page.goto(`${BASE}#/recipes/soup`);
+  const soup = page.locator('.facts');
+  const partial = await soup.innerText();
+  check(
+    partial.includes('All ingredients counted · sugar from 4 of 5'),
+    'the leeks still count for calories without sugar',
+  );
+  check(/of which sugar [\d.]+ g · 4 of 5/.test(partial), 'sugar says it comes from 4 of 5');
+  const leekLine = page.locator('.ingredients li', { hasText: '2 leeks' });
+  check(
+    (await leekLine.locator('.status.no-sugar').count()) === 1 &&
+      !(await leekLine.locator('.status.incomplete').count()) &&
+      (await leekLine.innerText()).includes('No sugar value'),
+    'the leek line gets the quiet sugar sign, not the yellow one',
+  );
+  check(
+    (await page.locator('.signs-key').innerText()).includes('No sugar value'),
+    'the key explains the quiet sign',
+  );
+  await page.locator('.signs-key').scrollIntoViewIfNeeded();
+  await shot(page, '29b Soup without leek sugar');
+  await page.locator('.coverage-btn').click();
+  const gapsSheet = page.getByRole('dialog');
+  await gapsSheet.waitFor();
+  check(
+    /No sugar value[\s\S]*2 leeks\s*Leeks/i.test(await gapsSheet.innerText()),
+    'What’s missing lists the leeks under No sugar value',
+  );
+  await shot(page, '29c Missing sugar');
+  await page.goBack();
+  await gapsSheet.waitFor({ state: 'hidden' });
+  await leekLine.click();
+  const pickSheet = page.getByRole('dialog');
+  await pickSheet.waitFor();
+  check(
+    (await pickSheet.getByRole('button', { name: /Add sugar to Leeks/ }).count()) === 1 &&
+      !(await pickSheet.locator('.fill').count()),
+    'the ingredient sheet offers a quiet link to add sugar',
+  );
+  await page.goBack();
+  await pickSheet.waitFor({ state: 'hidden' });
+
+  await page.goto(`${BASE}#/products`);
+  await page.locator('.tools .chip', { hasText: /^Missing info/ }).click();
+  const sugarChip = page.locator('.missing-chips .chip', { hasText: /^Sugar/ });
+  check(
+    (await sugarChip.innerText()).replace(/\s+/g, ' ') === 'Sugar 1',
+    'Missing info has a Sugar button',
+  );
+  await sugarChip.click();
+  const listed = await page.locator('.group').allInnerTexts();
+  check(
+    listed.join('\n').includes('Leeks') && !listed.join('\n').includes('Irish brown onions'),
+    'and it lists only the leeks',
+  );
   await collectCsp(page);
   await page.context().close();
 }
@@ -1584,6 +1661,7 @@ async function perPiece(browser, github) {
     ['Protein', '0.5'],
     ['Fat', '1.2'],
     ['Carbs', '1.8'],
+    ['Sugar', '0.4'],
   ])
     await page.getByLabel(`${label} per piece`).fill(value);
   await page.locator('.nutrients').scrollIntoViewIfNeeded();
@@ -1619,7 +1697,7 @@ async function ingredientMatching(browser, github) {
   await page.getByRole('heading', { name: 'Your recipe book is empty' }).waitFor();
   await page.evaluate(async () => {
     const now = new Date().toISOString();
-    const full = { kcal: 350, protein: 8, fat: 1, carbs: 77 };
+    const full = { kcal: 350, protein: 8, fat: 1, carbs: 77, sugar: 0.5 };
     const product = (id, name, extra = {}) => ({
       id,
       name,
@@ -1656,7 +1734,7 @@ async function ingredientMatching(browser, github) {
       for (const p of [
         product('carrots', 'Carrots', {
           ...priced,
-          nutrition: { kcal: 41, protein: 1, fat: 0.2, carbs: 7 },
+          nutrition: { kcal: 41, protein: 1, fat: 0.2, carbs: 7, sugar: 4.7 },
           weights: { piece: 60 },
         }),
         product('small', 'Small carrots', priced),

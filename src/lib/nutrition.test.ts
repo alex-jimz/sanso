@@ -221,12 +221,45 @@ describe('weightsNeeded', () => {
   });
 });
 
+describe('sugar', () => {
+  const sweetOnion = { ...onion, nutrition: { ...onion.nutrition, sugar: 4.2 } };
+
+  it('counts a line without sugar for calories, and flags only the sugar', () => {
+    const facts = lineFacts(line('300 g onion'), onion);
+    expect(facts.missing).toEqual([]);
+    expect(facts.nutrition?.kcal).toBeCloseTo(120);
+    expect(facts.sugar).toBeUndefined();
+    expect(facts.noSugar).toBe(true);
+    const sweet = lineFacts(line('300 g onion'), sweetOnion);
+    expect(sweet.sugar).toBeCloseTo(12.6);
+    expect(sweet.noSugar).toBe(false);
+    // Salt and the like count as no sugar.
+    const salty = lineFacts(line('1 tsp salt'), salt);
+    expect(salty.sugar).toBe(0);
+    expect(salty.noSugar).toBeFalsy();
+  });
+
+  it('adds up sugar per portion from the lines that have it', () => {
+    const recipe = { ingredients: ['300 g onion', '500 g chicken breast'], portions: 2 };
+    const some = recipeFacts(recipe, productResolver([sweetOnion, chicken]));
+    expect(some.nutritionCount).toBe(2);
+    expect(some.sugarCount).toBe(1);
+    expect(some.sugar).toBeCloseTo(6.3);
+    const all = recipeFacts(
+      recipe,
+      productResolver([sweetOnion, { ...chicken, nutrition: { ...chicken.nutrition, sugar: 0 } }]),
+    );
+    expect(all.sugarCount).toBe(2);
+  });
+});
+
 describe('cleaning', () => {
   it('keeps only valid numbers', () => {
     expect(cleanNutrition({ kcal: '120', protein: -1, fat: 0, carbs: 'x' })).toEqual({
       kcal: 120,
       fat: 0,
     });
+    expect(cleanNutrition({ kcal: 40, sugar: '4.2' })).toEqual({ kcal: 40, sugar: 4.2 });
     expect(cleanNutrition('nope')).toBeUndefined();
     expect(cleanWeights({ clove: 5, tbsp: 0, 'bad key': 3 })).toEqual({ clove: 5 });
     expect(cleanWeights({})).toBeUndefined();

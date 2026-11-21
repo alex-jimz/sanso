@@ -24,6 +24,17 @@ describe('the basic foods table', () => {
     expect(food('Garlic').weights).toMatchObject({ clove: 3 });
   });
 
+  it('has sugar for nearly every food, never more than its carbs', () => {
+    // USDA SR Legacy: onions 4.24 g sugars, bananas 12.23 g. Meat has none listed, and no carbs.
+    expect(food('Onion').sugar).toBe(4.2);
+    expect(food('Banana').sugar).toBe(12.2);
+    expect(food('Chicken breast').sugar).toBe(0);
+    const without = basicFoods.filter((f) => f.sugar === undefined).map((f) => f.name);
+    expect(without).toEqual(['Yellow pepper', 'Mint']);
+    for (const f of basicFoods)
+      if (f.sugar !== undefined) expect(f.sugar).toBeLessThanOrEqual(f.carbs);
+  });
+
   it('has unique names', () => {
     expect(new Set(basicFoods.map((f) => f.name)).size).toBe(basicFoods.length);
   });
@@ -66,7 +77,7 @@ describe('searchBasicFoods', () => {
 describe('fillFrom', () => {
   it('adds nutrition and weights a product doesn’t have', () => {
     const fill = fillFrom(food('Garlic'), { weights: { clove: 5 } });
-    expect(fill.nutrition).toEqual({ kcal: 149, protein: 6.4, fat: 0.5, carbs: 31 });
+    expect(fill.nutrition).toEqual({ kcal: 149, protein: 6.4, fat: 0.5, carbs: 31, sugar: 1 });
     expect(fill.weights).toEqual({ tsp: 2.8 });
     expect(applyFill({ weights: { clove: 5 } }, fill)).toEqual({
       nutrition: fill.nutrition,
@@ -75,11 +86,26 @@ describe('fillFrom', () => {
   });
 
   it('keeps nutrition that’s already complete', () => {
-    const own = { kcal: 45, protein: 1, fat: 0, carbs: 9 };
+    const own = { kcal: 45, protein: 1, fat: 0, carbs: 9, sugar: 5 };
     const fill = fillFrom(food('Onion'), { nutrition: own });
     expect(fill.nutrition).toBeUndefined();
+    expect(fill.sugar).toBeUndefined();
     expect(fill.weights).toEqual({ piece: 110, tbsp: 10 });
     expect(applyFill({ nutrition: own }, fill).nutrition).toBe(own);
+  });
+
+  it('adds only sugar to values per 100 g that have the other four', () => {
+    const own = { kcal: 45, protein: 1, fat: 0, carbs: 9 };
+    const fill = fillFrom(food('Onion'), { nutrition: own, weights: { piece: 120, tbsp: 10 } });
+    expect(fill).toEqual({ sugar: 4.2, weights: {} });
+    expect(applyFill({ nutrition: own }, fill).nutrition).toEqual({ ...own, sugar: 4.2 });
+    // Values per piece can't take sugar per 100 g.
+    const perPiece = fillFrom(food('Onion'), {
+      nutrition: own,
+      nutritionPer: 'piece',
+      weights: { piece: 120, tbsp: 10 },
+    });
+    expect(isEmptyFill(perPiece)).toBe(true);
   });
 
   it('switches values per piece back to per 100 g when it fills them', () => {
@@ -88,7 +114,9 @@ describe('fillFrom', () => {
   });
 
   it('has nothing to add when everything is set', () => {
-    const fill = fillFrom(food('Kale'), { nutrition: { kcal: 1, protein: 1, fat: 1, carbs: 1 } });
+    const fill = fillFrom(food('Kale'), {
+      nutrition: { kcal: 1, protein: 1, fat: 1, carbs: 1, sugar: 0 },
+    });
     expect(isEmptyFill(fill)).toBe(true);
   });
 });

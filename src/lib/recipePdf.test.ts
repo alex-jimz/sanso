@@ -1,7 +1,8 @@
 import { writeFileSync } from 'node:fs';
 import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { pdfFileName, recipePdf } from './recipePdf';
+import type { RecipeFacts } from './nutrition';
+import { factsSummary, pdfFileName, recipePdf } from './recipePdf';
 import type { Recipe } from './types';
 
 function recipe(extra: Partial<Recipe> = {}): Recipe {
@@ -57,6 +58,18 @@ describe('recipePdf', () => {
     // Set PDF_OUT to look at it.
     if (process.env.PDF_OUT)
       writeFileSync(process.env.PDF_OUT, new Uint8Array(await blob.arrayBuffer()));
+  });
+
+  it('says how many ingredients sugar comes from when not all of them', () => {
+    const facts = (sugarCount: number) =>
+      ({
+        lines: [{}, {}, {}],
+        nutritionCount: 3,
+        costCount: 3,
+        sugarCount,
+      }) as unknown as RecipeFacts;
+    expect(factsSummary(facts(3))).toBe('All ingredients counted.');
+    expect(factsSummary(facts(2))).toBe('All ingredients counted. Sugar from 2 of 3.');
   });
 
   it('names the file after the recipe', () => {
